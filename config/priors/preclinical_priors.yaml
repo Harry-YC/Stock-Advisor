@@ -1,0 +1,335 @@
+schema_version: "2.0"
+
+metadata:
+  version: "1.0.0"
+  created: "2025-12-06"
+  curator: "Preclinical Drug Development Team"
+  description: "Canonical frameworks for preclinical/translational oncology drug development"
+
+# ============================================================================
+# TIER 1: ESSENTIAL PRIORS (Always loaded)
+# ============================================================================
+
+tier_1_essential:
+  frameworks:
+
+    ich_m3r2:
+      citation:
+        authors: "ICH Expert Working Group"
+        title: "Guidance on Nonclinical Safety Studies for the Conduct of Human Clinical Trials and Marketing Authorization for Pharmaceuticals M3(R2)"
+        year: 2009
+        access: "open"
+
+      domain: "regulatory_guidance"
+      strength: "CRITICAL"
+      applies_to: ["all_scenarios"]
+
+      summary: |
+        ICH M3(R2) provides guidance on timing of nonclinical studies relative to
+        clinical development. Key principles include:
+        - Duration of toxicology studies based on intended clinical duration
+        - Safety pharmacology core battery requirements
+        - Reproductive toxicology timing relative to patient population
+        - Carcinogenicity study requirements
+
+      key_recommendations:
+        - "2-week toxicity studies support Phase I single-dose and short-term dosing"
+        - "1-month toxicity studies support Phase II dosing up to 1 month"
+        - "Safety pharmacology core battery before first human exposure"
+        - "Genotoxicity testing before Phase I (unless life-threatening indication)"
+
+    ich_s9:
+      citation:
+        authors: "ICH Expert Working Group"
+        title: "Nonclinical Evaluation for Anticancer Pharmaceuticals S9"
+        year: 2009
+        access: "open"
+
+      domain: "oncology_regulatory"
+      strength: "CRITICAL"
+      applies_to: ["all_scenarios"]
+
+      summary: |
+        ICH S9 provides specific guidance for anticancer drug development:
+        - Reduced nonclinical requirements for advanced cancer indications
+        - Flexibility in genotoxicity and reproductive toxicology timing
+        - Focus on safety margins rather than NOAEL-based dose selection
+        - Guidance on combination studies
+
+      key_recommendations:
+        - "Rodent-only toxicity acceptable for advanced cancer FIH"
+        - "Genotoxicity studies not required before Phase I in advanced cancer"
+        - "Embryo-fetal development studies may be deferred to post-approval"
+        - "10% HNSTD or 1/6 highest non-severely toxic dose for FIH starting dose"
+
+    fda_ind_guidance:
+      citation:
+        authors: "FDA"
+        title: "Content and Format of Investigational New Drug Applications (INDs)"
+        year: 2023
+        access: "open"
+
+      domain: "regulatory_guidance"
+      strength: "CRITICAL"
+      applies_to: ["all_scenarios"]
+
+      summary: |
+        FDA IND guidance outlines requirements for initiating clinical trials:
+        - CMC information for drug substance and product
+        - Pharmacology and toxicology data requirements
+        - Clinical protocol and investigator information
+        - Safety reporting requirements
+
+      key_recommendations:
+        - "IND submission at least 30 days before planned trial start"
+        - "GLP compliance for pivotal toxicology studies"
+        - "Stability data supporting proposed clinical use period"
+        - "Adequate characterization of drug substance identity and purity"
+
+    target_product_profile:
+      citation:
+        authors: "FDA"
+        title: "Target Product Profile - A Strategic Development Process Tool"
+        year: 2007
+        access: "open"
+
+      domain: "development_strategy"
+      strength: "HIGH"
+      applies_to: ["all_scenarios"]
+
+      summary: |
+        TPP framework for defining target attributes of a drug product:
+        - Indication and intended use
+        - Target efficacy endpoints and minimally acceptable improvement
+        - Target safety profile relative to existing therapies
+        - Proposed dosing regimen and route of administration
+
+      key_recommendations:
+        - "Define TPP early and update throughout development"
+        - "TPP should differentiate from standard of care"
+        - "Include both minimal and optimal target profiles"
+        - "Use TPP to guide go/no-go decisions"
+
+# ============================================================================
+# TIER 2: SCENARIO-SPECIFIC PRIORS
+# ============================================================================
+
+tier_2_scenario_specific:
+
+  target_validation:
+    - id: genetic_dependency_framework
+      citation:
+        authors: "Tsherniak A, et al"
+        title: "Defining a Cancer Dependency Map"
+        journal: "Cell"
+        year: 2017
+        pmid: "28753430"
+
+      domain: "target_validation"
+      strength: "HIGH"
+
+      summary: |
+        Project Achilles framework for identifying cancer dependencies using
+        genome-wide CRISPR screens. Key concepts:
+        - Essential vs context-specific dependencies
+        - Biomarker-dependency correlations
+        - Priority scoring for therapeutic targets
+
+      key_recommendations:
+        - "Validate target dependency in relevant cell line panels"
+        - "Correlate dependency with biomarker status"
+        - "Distinguish essential vs cancer-specific dependencies"
+        - "Consider genetic vs pharmacologic target validation"
+
+  pk_pd:
+    - id: human_dose_prediction
+      citation:
+        authors: "Mahmood I"
+        title: "Application of Allometric Principles for the Prediction of Pharmacokinetics in Human and Veterinary Drug Development"
+        journal: "Advanced Drug Delivery Reviews"
+        year: 2007
+        pmid: "17673321"
+
+      domain: "pk_prediction"
+      strength: "HIGH"
+
+      summary: |
+        Allometric scaling principles for human PK prediction:
+        - Simple allometry using body weight
+        - Correction factors for hepatically cleared compounds
+        - Species selection considerations
+        - Limitations and when to use PBPK instead
+
+      key_recommendations:
+        - "Use multiple species for robust prediction"
+        - "Apply correction factors for high clearance compounds"
+        - "Consider PBPK for complex PK or specific populations"
+        - "Validate predictions with human PK data when available"
+
+    - id: therapeutic_index_framework
+      citation:
+        authors: "Muller PY, Milton MN"
+        title: "The determination and interpretation of the therapeutic index in drug development"
+        journal: "Nature Reviews Drug Discovery"
+        year: 2012
+        pmid: "22653210"
+
+      domain: "safety_assessment"
+      strength: "HIGH"
+
+      summary: |
+        Framework for assessing therapeutic index:
+        - Exposure-based safety margins
+        - AUC and Cmax comparisons to NOAEL
+        - Target coverage considerations
+        - Therapeutic window estimation
+
+      key_recommendations:
+        - "Calculate exposure multiples at projected efficacious dose"
+        - "Consider free drug concentrations for safety margins"
+        - "Integrate target coverage with safety assessments"
+        - "Document therapeutic index evolution through development"
+
+  biomarker:
+    - id: fda_biomarker_qualification
+      citation:
+        authors: "FDA"
+        title: "Biomarker Qualification: Evidentiary Framework"
+        year: 2018
+        access: "open"
+
+      domain: "biomarker_development"
+      strength: "HIGH"
+
+      summary: |
+        FDA framework for biomarker qualification:
+        - Context of Use (COU) definition
+        - Evidentiary standards for different COUs
+        - Benefit-risk considerations for biomarker use
+        - Regulatory pathways for qualification
+
+      key_recommendations:
+        - "Clearly define Context of Use for biomarker"
+        - "Analytical validation before clinical validation"
+        - "Prospective-retrospective design acceptable for some COUs"
+        - "Consider fit-for-purpose validation"
+
+  competitive_intel:
+    - id: competitive_landscape_framework
+      citation:
+        authors: "Drug Development Best Practices"
+        title: "Competitive Intelligence Framework for Oncology Drug Development"
+        year: 2024
+
+      domain: "competitive_strategy"
+      strength: "MODERATE"
+
+      summary: |
+        Framework for competitive landscape analysis:
+        - Mechanism of action differentiation
+        - Clinical development timelines and milestones
+        - Efficacy and safety profile comparisons
+        - Market positioning considerations
+
+      key_recommendations:
+        - "Monitor clinical trial registrations and publications"
+        - "Identify differentiation opportunities vs competitors"
+        - "Assess combination potential"
+        - "Consider regulatory pathway implications"
+
+# ============================================================================
+# TIER 3: SUPPLEMENTAL CONTEXT
+# ============================================================================
+
+tier_3_supplemental:
+  frameworks:
+
+    pbpk_best_practices:
+      citation:
+        authors: "Jones H, et al"
+        title: "Physiologically Based Pharmacokinetic Modeling in Drug Discovery and Development"
+        journal: "CPT Pharmacometrics Syst Pharmacol"
+        year: 2015
+        pmid: "26312937"
+
+      domain: "pk_modeling"
+      strength: "MODERATE"
+
+      summary: |
+        Best practices for PBPK modeling in drug development:
+        - Model verification and validation
+        - Sensitivity analysis requirements
+        - Application to DDI prediction
+        - Regulatory acceptance considerations
+
+      key_recommendations:
+        - "Verify system parameters against known compounds"
+        - "Perform local and global sensitivity analyses"
+        - "Document model assumptions and limitations"
+        - "Use PBPK for mechanistic DDI predictions"
+
+# ============================================================================
+# PERSONA-FRAMEWORK MAPPING
+# ============================================================================
+
+persona_framework_defaults:
+
+  Bioscience Lead:
+    tier_1_frameworks:
+      - target_product_profile
+    tier_2_scenarios:
+      - target_validation
+
+  Translational Medicine Scientist:
+    tier_1_frameworks:
+      - ich_s9
+      - target_product_profile
+    tier_2_scenarios:
+      - biomarker
+      - target_validation
+
+  Competitive Intelligence Analyst:
+    tier_1_frameworks:
+      - target_product_profile
+    tier_2_scenarios:
+      - competitive_intel
+
+  DMPK Scientist:
+    tier_1_frameworks:
+      - ich_m3r2
+    tier_2_scenarios:
+      - pk_pd
+
+  Clinical Pharmacologist:
+    tier_1_frameworks:
+      - ich_m3r2
+      - ich_s9
+    tier_2_scenarios:
+      - pk_pd
+
+  Toxicology Expert:
+    tier_1_frameworks:
+      - ich_m3r2
+      - ich_s9
+      - fda_ind_guidance
+    tier_2_scenarios: []
+
+  Biomarker Strategist:
+    tier_1_frameworks:
+      - target_product_profile
+    tier_2_scenarios:
+      - biomarker
+
+  Regulatory Science Expert:
+    tier_1_frameworks:
+      - ich_m3r2
+      - ich_s9
+      - fda_ind_guidance
+    tier_2_scenarios: []
+
+  Panel Chair:
+    tier_1_frameworks:
+      - target_product_profile
+      - ich_s9
+    tier_2_scenarios:
+      - competitive_intel
