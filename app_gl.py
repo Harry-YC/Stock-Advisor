@@ -37,12 +37,14 @@ def check_password():
     def password_entered():
         """Checks whether a password entered by the user is correct."""
         entered = st.session_state.get("password", "")
-        correct_password = os.environ.get("APP_PASSWORD")
-        # Require APP_PASSWORD env var in production
-        if not correct_password:
+        # Accept either APP_PASS1 or APP_PASS2
+        pass1 = os.environ.get("APP_PASS1")
+        pass2 = os.environ.get("APP_PASS2")
+        # Require at least one password env var in production
+        if not pass1 and not pass2:
             st.session_state["password_correct"] = False
             return
-        if entered == correct_password:
+        if entered == pass1 or entered == pass2:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store password
         else:
