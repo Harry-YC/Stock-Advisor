@@ -10,30 +10,7 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Import citation utilities from centralized module
-from core.citation_utils import (
-    get_attr as get_citation_attr,
-    to_dict as citation_to_dict,
-    format_authors,
-    format_citation_short,
-    format_citation_full,
-    extract_pmids,
-    filter_by_pmids,
-    get_citation_by_pmid,
-    merge_citation_lists,
-)
-
-# Re-export for backward compatibility
 __all__ = [
-    'get_citation_attr',
-    'citation_to_dict',
-    'format_authors',
-    'format_citation_short',
-    'format_citation_full',
-    'extract_pmids',
-    'filter_by_pmids',
-    'get_citation_by_pmid',
-    'merge_citation_lists',
     'extract_simple_query',
     'user_friendly_error',
 ]
