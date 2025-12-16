@@ -260,7 +260,8 @@ class ExpertDiscussionService:
         Returns:
             Dict mapping expert name to response dict
         """
-        from gdg import call_expert, GDG_PERSONAS as PRECLINICAL_EXPERTS
+        from travel.travel_personas import TRAVEL_EXPERTS, call_travel_expert as call_expert
+        PRECLINICAL_EXPERTS = TRAVEL_EXPERTS  # Use travel experts
 
         responses = {}
 
@@ -275,8 +276,8 @@ class ExpertDiscussionService:
                 try:
                     from integrations.google_search import search_with_grounding
                     _, web_sources = search_with_grounding(
-                        question=clinical_question, 
-                        system_context="Find recent drug development news and clinical trial updates",
+                        question=clinical_question,
+                        system_context="Find travel tips, local recommendations, tourist attractions, and destination information",
                         max_sources=5
                     )
                     # Convert to context string
@@ -787,7 +788,8 @@ Also add any important findings from the literature that you missed in your init
         Returns:
             DiscussionRoundResult with responses and failures
         """
-        from gdg import format_evidence_context, call_expert
+        from gdg.gdg_utils import format_evidence_context
+        from travel.travel_personas import call_travel_expert as call_expert
         from core.priors_manager import PriorsManager
 
         # Initialize priors manager
@@ -917,7 +919,8 @@ Also add any important findings from the literature that you missed in your init
         Returns:
             New response dict with 'regenerated' flag and 'history'
         """
-        from gdg import format_evidence_context, call_expert
+        from gdg.gdg_utils import format_evidence_context
+        from travel.travel_personas import call_travel_expert as call_expert
         from core.priors_manager import PriorsManager
         from datetime import datetime
 
@@ -1137,9 +1140,10 @@ Also add any important findings from the literature that you missed in your init
         3. Mitigation: Pro_expert proposes a fix.
         4. Synthesis: Chairperson summarizes.
         """
-        from gdg import format_evidence_context, call_expert
+        from gdg.gdg_utils import format_evidence_context
+        from travel.travel_personas import call_travel_expert as call_expert
         from core.priors_manager import PriorsManager
-        
+
         # 0. Setup Contexts
         evidence_context_pro = format_evidence_context({'citations': citations}, pro_expert, 5, clinical_question)
         evidence_context_con = format_evidence_context({'citations': citations}, con_expert, 5, clinical_question)
@@ -1222,7 +1226,8 @@ Also add any important findings from the literature that you missed in your init
         3. Critique: Simulated Peer Reviewer identifies gaps/bias.
         4. Revision: Author rewrites for the final version.
         """
-        from gdg import format_evidence_context, call_expert
+        from gdg.gdg_utils import format_evidence_context
+        from travel.travel_personas import call_travel_expert as call_expert
         from core.llm_utils import get_llm_client
         client = get_llm_client(api_key=self.api_key, model=self.model)
 

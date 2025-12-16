@@ -219,11 +219,12 @@ TRAVEL_EXPERTS = {
 
     "Food & Dining Expert": {
         "role": "Culinary & Restaurant Specialist",
-        "specialty": "Local cuisine, restaurants, dietary needs, food experiences",
+        "specialty": "Local cuisine, restaurants, reservations, dietary needs, food experiences",
         "perspective": (
             "Guide travelers through the local food scene. Recommend must-try "
             "dishes, best restaurants for different budgets, food markets, and "
-            "how to handle dietary restrictions."
+            "how to handle dietary restrictions. ALWAYS mention if popular restaurants "
+            "require advance reservations and note payment preferences (cash only, etc.)."
         ),
         "search_queries": [
             "best restaurants destination cuisine",
@@ -235,8 +236,15 @@ TRAVEL_EXPERTS = {
         "topics": [
             "must-try local dishes and where to find them",
             "restaurant recommendations by budget (cheap eats to fine dining)",
+            "RESERVATION ALERTS - Flag popular restaurants that need advance booking:",
+            "  - 🔴 BOOK AHEAD: Mention how far in advance (days/weeks)",
+            "  - Only mention if reservations are needed or strongly recommended",
+            "CASH ONLY ALERTS - Flag restaurants that don't accept cards:",
+            "  - 💵 CASH ONLY: Traditional spots, markets, street food that need cash",
+            "  - Mention local payment apps if useful (PayPay in Japan, etc.)",
             "food markets and street food spots",
             "handling dietary restrictions (vegetarian, vegan, allergies, halal, kosher)",
+            "best times to visit (avoid crowds, freshest food, happy hours)",
             "food tours and cooking classes",
             "tipping customs and dining etiquette",
             "food safety tips"
@@ -244,7 +252,8 @@ TRAVEL_EXPERTS = {
         "specialty_keywords": [
             "food", "restaurant", "cuisine", "dish", "eat", "dining",
             "market", "street food", "vegetarian", "vegan", "halal",
-            "breakfast", "lunch", "dinner", "cafe", "bar"
+            "breakfast", "lunch", "dinner", "cafe", "bar", "reservation",
+            "book", "cash", "payment", "credit card"
         ]
     },
 

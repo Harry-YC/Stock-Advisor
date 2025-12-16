@@ -111,7 +111,7 @@ class OpenWeatherClient:
             raise RuntimeError("OpenWeatherMap API key not configured")
 
         params["appid"] = self.api_key
-        params["units"] = "metric"  # Use Celsius
+        params["units"] = "imperial"  # Use Fahrenheit
 
         try:
             response = requests.get(
@@ -301,14 +301,14 @@ class OpenWeatherClient:
             return "Weather forecast unavailable."
 
         lines = ["## Weather Forecast\n"]
-        lines.append("| Date | Weather | Temp (°C) | Humidity | Rain % | Wind |")
+        lines.append("| Date | Weather | Temp (°F) | Humidity | Rain % | Wind |")
         lines.append("|------|---------|-----------|----------|--------|------|")
 
         for f in forecasts:
             date_str = datetime.strptime(f.date, "%Y-%m-%d").strftime("%a %m/%d")
             temp_range = f"{f.temp_min:.0f}°-{f.temp_max:.0f}°"
             lines.append(
-                f"| {date_str} | {f.icon_emoji} {f.description[:15]} | {temp_range} | {f.humidity}% | {f.precipitation_chance:.0f}% | {f.wind_speed:.1f}m/s |"
+                f"| {date_str} | {f.icon_emoji} {f.description[:15]} | {temp_range} | {f.humidity}% | {f.precipitation_chance:.0f}% | {f.wind_speed:.0f}mph |"
             )
 
         return "\n".join(lines)

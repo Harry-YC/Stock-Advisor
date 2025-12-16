@@ -1,65 +1,45 @@
-# Literature Review Platform - Dependencies
+# Travel Planner - Dependencies
+# Last updated: 2025-12-16
 
+# =============================================================================
 # Core Framework
-streamlit>=1.28.0
-pandas>=2.0.0
-numpy>=1.24.0
+# =============================================================================
+chainlit>=1.3.0
+python-dotenv>=1.0.0
 
+# =============================================================================
+# AI & LLM
+# =============================================================================
+openai>=1.0.0                    # OpenAI-compatible API for Gemini
+google-generativeai>=0.8.0       # Native Gemini SDK (for grounding)
+google-genai>=0.5.0              # New Gemini SDK (for Maps grounding)
+
+# =============================================================================
 # API Clients
-requests>=2.31.0
-biopython>=1.81  # For PubMed Entrez (optional, enhanced parsing)
+# =============================================================================
+requests>=2.31.0                 # HTTP client for APIs
+aiohttp>=3.9.0                   # Async HTTP for Chainlit
 
-# Data Storage
-python-dotenv>=1.0.0  # For .env file support
+# =============================================================================
+# Data Processing
+# =============================================================================
+pandas>=2.0.0                    # Data manipulation
+python-dateutil>=2.8.2           # Date parsing
 
-# Network Analysis
-networkx>=3.0  # Citation network graphs
+# =============================================================================
+# Document Export
+# =============================================================================
+python-docx>=0.8.11              # Word document export
+openpyxl>=3.1.0                  # Excel export
 
-# Machine Learning (Active Learning)
-scikit-learn>=1.3.0
-scipy>=1.11.0
+# =============================================================================
+# Database (Optional - SQLite persistence)
+# =============================================================================
+aiosqlite>=0.19.0                # Async SQLite
+sqlalchemy>=2.0.0                # ORM
 
-# Semantic Search (BioBERT embeddings - optional)
-sentence-transformers>=2.2.0
-torch>=2.0.0
-transformers>=4.30.0
-
-# Vector Database
-qdrant-client>=1.7.0
-
-# OpenAI Integration (for AI features)
-openai>=1.0.0
-
-# Visualization
-plotly>=5.17.0
-matplotlib>=3.7.0
-
-# Reference Management Integration
-pyzotero>=1.5.0  # Zotero API client
-
-# Data Formats
-pybtex>=0.24.0  # BibTeX parsing/generation
-rispy>=0.6.0  # RIS format support
-PyYAML>=6.0  # YAML configuration parsing
-
-# Document Processing
-python-docx>=0.8.11  # Word document export/import
-openpyxl>=3.1.0  # Excel export for evidence tables
-PyMuPDF>=1.23.0  # PDF text extraction
-beautifulsoup4>=4.12.0  # Web page content extraction
-
-# Utilities
-python-dateutil>=2.8.2
-tqdm>=4.66.0  # Progress bars
-
-# Testing (Development)
+# =============================================================================
+# Development & Testing
+# =============================================================================
 pytest>=7.4.0
-pytest-cov>=4.1.0
-playwright>=1.40.0
-
-# Type Checking (Development)
-mypy>=1.5.0
-types-requests>=2.31.0
-
-# Google Search Grounding
-google-generativeai>=0.8.0
+pytest-asyncio>=0.21.0

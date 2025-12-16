@@ -29,6 +29,23 @@ class PlaceResult:
     price_level: Optional[int]  # 0-4 (PRICE_LEVEL_INEXPENSIVE to PRICE_LEVEL_VERY_EXPENSIVE)
     address: str
     types: List[str]
+    business_status: str = "OPERATIONAL"  # OPERATIONAL, CLOSED_TEMPORARILY, CLOSED_PERMANENTLY
+
+    @property
+    def is_open(self) -> bool:
+        """Check if business is currently operational."""
+        return self.business_status == "OPERATIONAL"
+
+    @property
+    def status_display(self) -> str:
+        """Human-readable status."""
+        if self.business_status == "OPERATIONAL":
+            return ""
+        elif self.business_status == "CLOSED_TEMPORARILY":
+            return "⚠️ Temporarily Closed"
+        elif self.business_status == "CLOSED_PERMANENTLY":
+            return "❌ Permanently Closed"
+        return ""
 
     @property
     def price_display(self) -> str:
@@ -122,7 +139,8 @@ class GooglePlacesClient:
         query: str,
         location: str,
         place_type: str = "restaurant",
-        max_results: int = 5
+        max_results: int = 5,
+        exclude_closed: bool = True
     ) -> List[PlaceResult]:
         """
         Search for places using Text Search API with minimal field mask.
@@ -132,13 +150,14 @@ class GooglePlacesClient:
             location: City/destination context
             place_type: One of: restaurant, lodging, tourist_attraction
             max_results: Max places to return (default 5)
+            exclude_closed: Filter out temporarily/permanently closed places (default True)
 
         Returns:
             List of PlaceResult with basic info
 
         Cost: ~$0.032 per request (reduced from ~$0.10 with field mask)
         """
-        cache_key = self._cache_key(f"{query}:{place_type}", location)
+        cache_key = self._cache_key(f"{query}:{place_type}:{exclude_closed}", location)
         cached = self._get_cached(cache_key)
         if cached:
             return cached
@@ -149,6 +168,7 @@ class GooglePlacesClient:
 
         try:
             # Text Search (New) API with minimal field mask
+            # Include businessStatus to filter out closed places
             response = requests.post(
                 f"{self.BASE_URL}:searchText",
                 headers={
@@ -161,12 +181,13 @@ class GooglePlacesClient:
                         "places.userRatingCount,"
                         "places.priceLevel,"
                         "places.formattedAddress,"
-                        "places.types"
+                        "places.types,"
+                        "places.businessStatus"
                     )
                 },
                 json={
                     "textQuery": f"{query} {place_type} in {location}",
-                    "maxResultCount": max_results,
+                    "maxResultCount": max_results + 5 if exclude_closed else max_results,  # Fetch extra to account for filtering
                     "languageCode": "en"
                 },
                 timeout=15
@@ -176,6 +197,13 @@ class GooglePlacesClient:
 
             results = []
             for place in data.get("places", []):
+                status = place.get("businessStatus", "OPERATIONAL")
+
+                # Skip closed places if requested
+                if exclude_closed and status != "OPERATIONAL":
+                    logger.debug(f"Skipping closed place: {place.get('displayName', {}).get('text')} ({status})")
+                    continue
+
                 results.append(PlaceResult(
                     place_id=place.get("id", ""),
                     name=place.get("displayName", {}).get("text", "Unknown"),
@@ -183,11 +211,16 @@ class GooglePlacesClient:
                     user_ratings_total=place.get("userRatingCount", 0),
                     price_level=place.get("priceLevel"),
                     address=place.get("formattedAddress", ""),
-                    types=place.get("types", [])
+                    types=place.get("types", []),
+                    business_status=status
                 ))
 
+                # Stop once we have enough results
+                if len(results) >= max_results:
+                    break
+
             self._set_cached(cache_key, results)
-            logger.info(f"Found {len(results)} places for '{query}' in {location}")
+            logger.info(f"Found {len(results)} open places for '{query}' in {location}")
             return results
 
         except requests.exceptions.HTTPError as e:
@@ -302,6 +335,10 @@ class GooglePlacesClient:
 
         parts = [f"**{place.name}**"]
 
+        # Show closed status prominently if not operational
+        if place.status_display:
+            parts.append(place.status_display)
+
         if place.rating > 0:
             parts.append(f"★{place.rating:.1f}")
 
@@ -311,7 +348,9 @@ class GooglePlacesClient:
         if place.price_display != "N/A":
             parts.append(place.price_display)
 
-        parts.append(emoji)
+        # Only show trust emoji if place is open
+        if place.is_open:
+            parts.append(emoji)
 
         return " ".join(parts)
 

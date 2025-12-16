@@ -1,12 +1,8 @@
 """
-LLM Router Service for Palliative Surgery GDG
+LLM Router Service for Travel Planner
 
-Provides a unified interface for routing LLM calls to the appropriate model:
-- Expert discussions → Gemini (default)
-- Screening/fast queries → GPT-5-mini
-- Synthesis/reasoning → Configurable reasoning model
-
-This abstraction allows easy model swapping and consistent error handling.
+Provides a unified interface for Gemini LLM calls.
+Uses Google's Gemini API via OpenAI-compatible endpoint.
 """
 
 import logging
@@ -30,18 +26,15 @@ class LLMResponse:
 
 class LLMRouter:
     """
-    Route LLM calls to appropriate model based on task type.
+    Route LLM calls to Gemini models.
 
     Usage:
         router = LLMRouter()
-        response = router.call_expert("What is the evidence for...", system="You are a surgical oncologist...")
-        response = router.call_screening("Is this paper relevant to palliative surgery?")
-        response = router.call_synthesis("Synthesize these findings...", system="You are a GDG chair...")
+        response = router.call_expert("Plan a trip to Barcelona", system="You are a travel expert...")
     """
 
     def __init__(
         self,
-        openai_api_key: Optional[str] = None,
         google_api_key: Optional[str] = None,
         default_timeout: int = 120
     ):
@@ -49,33 +42,17 @@ class LLMRouter:
         Initialize the LLM Router.
 
         Args:
-            openai_api_key: OpenAI API key (uses settings default if not provided)
             google_api_key: Google API key for Gemini (uses settings default if not provided)
             default_timeout: Default timeout in seconds for API calls
         """
-        self.openai_api_key = openai_api_key or settings.OPENAI_API_KEY
-        self.google_api_key = google_api_key or settings.GOOGLE_API_KEY
+        self.google_api_key = google_api_key or settings.GEMINI_API_KEY
         self.default_timeout = default_timeout
 
         # Model assignments from settings
         self.expert_model = getattr(settings, 'EXPERT_MODEL', 'gemini-3-pro-preview')
-        self.screening_model = getattr(settings, 'SCREENING_MODEL', 'gpt-5-mini')
-        self.reasoning_model = getattr(settings, 'REASONING_MODEL', 'gemini-3-pro-preview')
 
-        # Lazy-loaded clients
-        self._openai_client = None
+        # Lazy-loaded client
         self._gemini_client = None
-
-    @property
-    def openai_client(self):
-        """Lazy-load OpenAI client."""
-        if self._openai_client is None:
-            from openai import OpenAI
-            self._openai_client = OpenAI(
-                api_key=self.openai_api_key,
-                timeout=self.default_timeout
-            )
-        return self._openai_client
 
     @property
     def gemini_client(self):
@@ -102,8 +79,6 @@ class LLMRouter:
         """
         Call LLM for expert discussions.
 
-        Uses Gemini by default for expert discussions.
-
         Args:
             prompt: The user prompt
             system: Optional system prompt
@@ -115,58 +90,7 @@ class LLMRouter:
             LLMResponse with content and metadata
         """
         model = model or self.expert_model
-        return self._route_call(prompt, system, model, temperature, max_tokens)
-
-    def call_screening(
-        self,
-        prompt: str,
-        system: Optional[str] = None,
-        temperature: float = 0.3,
-        max_tokens: int = 500
-    ) -> LLMResponse:
-        """
-        Call LLM for screening/classification tasks.
-
-        Uses GPT-5-mini for fast, cost-effective screening.
-
-        Args:
-            prompt: The screening prompt
-            system: Optional system prompt
-            temperature: Temperature (lower for more deterministic)
-            max_tokens: Maximum tokens in response
-
-        Returns:
-            LLMResponse with content and metadata
-        """
-        return self._route_call(
-            prompt, system, self.screening_model, temperature, max_tokens
-        )
-
-    def call_synthesis(
-        self,
-        prompt: str,
-        system: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: float = 0.5,
-        max_tokens: int = 6000
-    ) -> LLMResponse:
-        """
-        Call LLM for synthesis/reasoning tasks.
-
-        Uses the reasoning model for complex analysis.
-
-        Args:
-            prompt: The synthesis prompt
-            system: Optional system prompt
-            model: Override model
-            temperature: Temperature
-            max_tokens: Maximum tokens in response
-
-        Returns:
-            LLMResponse with content and metadata
-        """
-        model = model or self.reasoning_model
-        return self._route_call(prompt, system, model, temperature, max_tokens)
+        return self._call_gemini(prompt, system, model, temperature, max_tokens)
 
     def call_expert_stream(
         self,
@@ -191,78 +115,8 @@ class LLMRouter:
         """
         model = model or self.expert_model
 
-        for chunk in self._route_call_stream(prompt, system, model, temperature, max_tokens):
+        for chunk in self._call_gemini_stream(prompt, system, model, temperature, max_tokens):
             yield chunk
-
-    def _route_call(
-        self,
-        prompt: str,
-        system: Optional[str],
-        model: str,
-        temperature: float,
-        max_tokens: int
-    ) -> LLMResponse:
-        """Route call to appropriate provider based on model name."""
-        if self._is_gemini_model(model):
-            return self._call_gemini(prompt, system, model, temperature, max_tokens)
-        else:
-            return self._call_openai(prompt, system, model, temperature, max_tokens)
-
-    def _route_call_stream(
-        self,
-        prompt: str,
-        system: Optional[str],
-        model: str,
-        temperature: float,
-        max_tokens: int
-    ) -> Generator[Dict[str, Any], None, None]:
-        """Route streaming call to appropriate provider."""
-        if self._is_gemini_model(model):
-            yield from self._call_gemini_stream(prompt, system, model, temperature, max_tokens)
-        else:
-            yield from self._call_openai_stream(prompt, system, model, temperature, max_tokens)
-
-    def _is_gemini_model(self, model: str) -> bool:
-        """Check if model is a Gemini model."""
-        return 'gemini' in model.lower()
-
-    def _call_openai(
-        self,
-        prompt: str,
-        system: Optional[str],
-        model: str,
-        temperature: float,
-        max_tokens: int
-    ) -> LLMResponse:
-        """Call OpenAI API."""
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-
-        try:
-            response = self.openai_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-
-            return LLMResponse(
-                content=response.choices[0].message.content or "",
-                model=model,
-                finish_reason=response.choices[0].finish_reason or "unknown",
-                usage={
-                    "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                    "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                    "total_tokens": response.usage.total_tokens if response.usage else 0
-                },
-                raw_response=response
-            )
-
-        except Exception as e:
-            logger.error(f"OpenAI call failed: {e}")
-            raise
 
     def _call_gemini(
         self,
@@ -301,46 +155,6 @@ class LLMRouter:
         except Exception as e:
             logger.error(f"Gemini call failed: {e}")
             raise
-
-    def _call_openai_stream(
-        self,
-        prompt: str,
-        system: Optional[str],
-        model: str,
-        temperature: float,
-        max_tokens: int
-    ) -> Generator[Dict[str, Any], None, None]:
-        """Stream from OpenAI API."""
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-
-        try:
-            stream = self.openai_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True
-            )
-
-            full_content = ""
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
-                    full_content += content
-                    yield {"type": "chunk", "content": content}
-
-            yield {
-                "type": "complete",
-                "content": full_content,
-                "finish_reason": "stop"
-            }
-
-        except Exception as e:
-            logger.error(f"OpenAI stream failed: {e}")
-            yield {"type": "error", "content": str(e)}
 
     def _call_gemini_stream(
         self,

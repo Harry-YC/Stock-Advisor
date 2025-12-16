@@ -1,1 +1,1 @@
-web: streamlit run app_gl.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+web: chainlit run app_tp2.py --host 0.0.0.0 --port $PORT

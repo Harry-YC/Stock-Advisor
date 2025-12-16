@@ -1,11 +1,11 @@
 """
-Export UI Module for Palliative Surgery GDG
+Export UI Module for Travel Planner
 
 Provides comprehensive export functionality for:
-- GDG discussion summaries
-- Evidence tables
-- Structured recommendations
-- Full guideline documents
+- Travel plan summaries
+- Expert recommendations
+- Itinerary export to Excel
+- Full trip documents
 """
 
 import streamlit as st
@@ -14,12 +14,13 @@ from io import BytesIO
 from typing import Dict, List, Any, Optional
 
 from config import settings
+from services.excel_export_service import export_travel_plan_to_excel
 
 
 def render_export():
     """Render the Export tab interface."""
     st.header("Export")
-    st.caption("Export GDG discussions, evidence, and recommendations")
+    st.caption("Export travel plans, itineraries, and expert recommendations")
 
     # Check what data is available
     research_result = st.session_state.get('research_result')
@@ -31,7 +32,7 @@ def render_export():
     _render_content_summary(research_result, expert_discussion, search_results, cdp_sections)
 
     if not research_result and not expert_discussion and not search_results:
-        st.info("No content available to export. Ask a question or run a GDG discussion first.")
+        st.info("No content available to export. Ask a question or run an expert discussion first.")
         return
 
     st.markdown("---")
@@ -41,7 +42,7 @@ def render_export():
     with col1:
         export_format = st.selectbox(
             "Export Format",
-            ["Markdown", "Word Document", "JSON"],
+            ["Excel Itinerary", "Markdown", "Word Document", "JSON"],
             key="export_format_select"
         )
 
@@ -52,85 +53,129 @@ def render_export():
             key="export_scope_select"
         )
 
-    # Content selection
-    st.markdown("### Content to Include")
-    col1, col2 = st.columns(2)
+    # Content selection (not needed for Excel export)
+    if export_format != "Excel Itinerary":
+        st.markdown("### Content to Include")
+        col1, col2 = st.columns(2)
 
-    with col1:
-        include_question = st.checkbox("Clinical Question", value=True, key="export_include_question")
-        include_evidence = st.checkbox("Evidence Table", value=True, key="export_include_evidence")
-        include_recommendation = st.checkbox("Recommendation", value=True, key="export_include_recommendation")
+        with col1:
+            include_question = st.checkbox("Travel Question", value=True, key="export_include_question")
+            include_evidence = st.checkbox("Research Sources", value=True, key="export_include_evidence")
+            include_recommendation = st.checkbox("Trip Plan", value=True, key="export_include_recommendation")
 
-    with col2:
-        include_discussion = st.checkbox("Expert Discussion", value=True, key="export_include_discussion")
-        include_citations = st.checkbox("Citation List", value=True, key="export_include_citations")
-        include_metadata = st.checkbox("Metadata", value=False, key="export_include_metadata")
+        with col2:
+            include_discussion = st.checkbox("Expert Discussion", value=True, key="export_include_discussion")
+            include_citations = st.checkbox("Source List", value=True, key="export_include_citations")
+            include_metadata = st.checkbox("Metadata", value=False, key="export_include_metadata")
+    else:
+        # For Excel, all content is included automatically
+        include_question = True
+        include_evidence = True
+        include_recommendation = True
+        include_discussion = True
+        include_citations = True
+        include_metadata = False
+        st.info("Excel export includes: Overview, Day-by-Day Itinerary, Accommodations, Transportation, Budget, and Expert Tips")
 
     st.markdown("---")
 
     # Generate and download
     if st.button("Generate Export", type="primary", use_container_width=True):
         with st.spinner("Generating export..."):
-            content = _generate_export_content(
-                export_format=export_format,
-                export_scope=export_scope,
-                include_question=include_question,
-                include_evidence=include_evidence,
-                include_recommendation=include_recommendation,
-                include_discussion=include_discussion,
-                include_citations=include_citations,
-                include_metadata=include_metadata,
-                research_result=research_result,
-                expert_discussion=expert_discussion,
-                search_results=search_results,
-                cdp_sections=cdp_sections
-            )
+            # Handle Excel export separately
+            if export_format == "Excel Itinerary":
+                if research_result:
+                    question = research_result.get('question', '')
+                    recommendation = research_result.get('recommendation', '')
+                    expert_responses = research_result.get('expert_responses', {})
 
-            if content:
-                st.session_state.export_content = content
-                st.success("Export generated!")
+                    try:
+                        excel_buffer = export_travel_plan_to_excel(
+                            question=question,
+                            recommendation=recommendation,
+                            expert_responses=expert_responses
+                        )
+                        st.session_state.excel_export_buffer = excel_buffer
+                        st.session_state.export_content = "Excel export ready for download"
+                        st.success("Excel itinerary generated!")
+                    except Exception as e:
+                        st.error(f"Failed to generate Excel: {e}")
+                else:
+                    st.warning("No travel plan data available. Ask a travel question first.")
+            else:
+                content = _generate_export_content(
+                    export_format=export_format,
+                    export_scope=export_scope,
+                    include_question=include_question,
+                    include_evidence=include_evidence,
+                    include_recommendation=include_recommendation,
+                    include_discussion=include_discussion,
+                    include_citations=include_citations,
+                    include_metadata=include_metadata,
+                    research_result=research_result,
+                    expert_discussion=expert_discussion,
+                    search_results=search_results,
+                    cdp_sections=cdp_sections
+                )
+
+                if content:
+                    st.session_state.export_content = content
+                    st.success("Export generated!")
 
     # Display preview and download button
     if st.session_state.get('export_content'):
         content = st.session_state.export_content
 
-        st.markdown("### Preview")
-        with st.expander("View Export Content", expanded=True):
-            if export_format == "JSON":
-                st.json(content if isinstance(content, dict) else {"content": content})
-            else:
-                st.markdown(content[:5000] + "..." if len(content) > 5000 else content)
-
-        # Download button
-        if export_format == "Markdown":
+        # Download button for Excel
+        if export_format == "Excel Itinerary" and st.session_state.get('excel_export_buffer'):
+            st.markdown("### Download")
+            excel_buffer = st.session_state.excel_export_buffer
             st.download_button(
-                label="Download Markdown",
-                data=content,
-                file_name=f"gdg_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                mime="text/markdown",
+                label="Download Excel Itinerary",
+                data=excel_buffer,
+                file_name=f"travel_itinerary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
-        elif export_format == "Word Document":
-            # Generate Word document
-            docx_buffer = _generate_word_document(content)
-            if docx_buffer:
+            st.caption("Excel includes: Overview, Itinerary, Accommodations, Transportation, Budget, and Expert Tips sheets")
+        else:
+            st.markdown("### Preview")
+            with st.expander("View Export Content", expanded=True):
+                if export_format == "JSON":
+                    st.json(content if isinstance(content, dict) else {"content": content})
+                else:
+                    st.markdown(content[:5000] + "..." if len(content) > 5000 else content)
+
+            # Download button
+            if export_format == "Markdown":
                 st.download_button(
-                    label="Download Word Document",
-                    data=docx_buffer,
-                    file_name=f"gdg_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    label="Download Markdown",
+                    data=content,
+                    file_name=f"travel_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                    mime="text/markdown",
                     use_container_width=True
                 )
-        elif export_format == "JSON":
-            import json
-            json_str = json.dumps(content if isinstance(content, dict) else {"content": content}, indent=2)
-            st.download_button(
-                label="Download JSON",
-                data=json_str,
-                file_name=f"gdg_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json",
-                use_container_width=True
-            )
+            elif export_format == "Word Document":
+                # Generate Word document
+                docx_buffer = _generate_word_document(content)
+                if docx_buffer:
+                    st.download_button(
+                        label="Download Word Document",
+                        data=docx_buffer,
+                        file_name=f"travel_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True
+                    )
+            elif export_format == "JSON":
+                import json
+                json_str = json.dumps(content if isinstance(content, dict) else {"content": content}, indent=2)
+                st.download_button(
+                    label="Download JSON",
+                    data=json_str,
+                    file_name=f"travel_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
 
 
 def _render_content_summary(research_result, expert_discussion, search_results, cdp_sections):
@@ -196,12 +241,12 @@ def _generate_export_content(
     sections = []
 
     # Header
-    sections.append(f"# Palliative Surgery GDG Export")
+    sections.append(f"# Travel Planner Export")
     sections.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     sections.append(f"**Scope:** {export_scope}")
     sections.append("")
 
-    # Clinical Question
+    # Travel Question
     if include_question:
         question = None
         if research_result:
@@ -211,14 +256,14 @@ def _generate_export_content(
             question = st.session_state.get('current_question') or st.session_state.get('expert_clinical_question')
 
         if question:
-            sections.append("## Clinical Question")
+            sections.append("## Travel Question")
             sections.append(f"> {question}")
             sections.append("")
 
-    # Recommendation
+    # Trip Plan
     if include_recommendation and research_result:
-        sections.append("## Recommendation")
-        recommendation = research_result.get('recommendation', 'No recommendation available')
+        sections.append("## Trip Plan")
+        recommendation = research_result.get('recommendation', 'No plan available')
         confidence = research_result.get('confidence', 'Unknown')
         sections.append(f"**Confidence:** {confidence}")
         sections.append("")
@@ -228,7 +273,7 @@ def _generate_export_content(
         # Key findings
         key_findings = research_result.get('key_findings', [])
         if key_findings:
-            sections.append("### Key Findings")
+            sections.append("### Key Highlights")
             for finding in key_findings:
                 sections.append(f"- {finding}")
             sections.append("")
@@ -313,7 +358,7 @@ def _generate_export_content(
 
     # Footer
     sections.append("---")
-    sections.append("*Generated by Palliative Surgery GDG v1.0*")
+    sections.append("*Generated by Travel Planner v1.0*")
 
     return "\n".join(sections)
 

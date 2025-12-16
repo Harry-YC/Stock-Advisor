@@ -38,11 +38,11 @@ def get_llm_client(api_key: str = None, model: str = None) -> OpenAI:
     
     # Check if this is a Gemini model requesting Google routing
     if model and model.lower().startswith("gemini"):
-        google_key = api_key or settings.GOOGLE_API_KEY
+        google_key = api_key or settings.GEMINI_API_KEY
         base_url = settings.GEMINI_BASE_URL
-        
+
         if not google_key:
-            logger.warning("Gemini model requested but GOOGLE_API_KEY not set. Falling back to provided key or OpenAI key.")
+            logger.warning("Gemini model requested but GEMINI_API_KEY not set. Falling back to provided key or OpenAI key.")
             google_key = api_key or settings.OPENAI_API_KEY
 
         logger.debug(f"Creating Gemini adapter client for model: {model}")

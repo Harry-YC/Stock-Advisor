@@ -1,25 +1,25 @@
 """
-Palliative Surgery GDG Home - Ask the GDG (v1.0)
+Travel Planner Home - Plan Your Trip (v1.0)
 
-The conversational interface for the Palliative Surgery GDG platform.
-Question-first workflow: ask a clinical question → search evidence → consult GDG → recommend.
+The conversational interface for the Travel Planner platform.
+Question-first workflow: ask a travel question → search info → consult experts → recommend.
 
 State Router: home → processing → answer
 """
 
 import streamlit as st
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, date, timedelta
+from typing import Optional, Dict
 
 from config import settings
-from core.question_templates import QUESTION_TYPES, get_all_question_types, get_experts_for_question_type
 from core.state_manager import reset_conversational_state
 from core.database import ProjectDAO, ProgramProfileDAO, DatabaseManager
 from core.utils import user_friendly_error
 from services.research_partner_service import ResearchPartnerService, ResearchResult
 from ui.answer_view import render_answer_view
 from ui.evidence_drawer import render_evidence_drawer
-from gdg.gdg_personas import GDG_PERSONAS, GDG_CATEGORIES, GDG_PRESETS
+from travel.travel_personas import TRAVEL_EXPERTS, TRAVEL_CATEGORIES, TRAVEL_PRESETS
+from travel.travel_templates import TRAVEL_QUESTION_TYPES, detect_travel_question_type
 
 
 # Centered container styling
@@ -140,14 +140,91 @@ div[class*="e1gk92lc"] {
 """
 
 
+def _render_trip_form() -> Dict:
+    """
+    Render structured trip input form.
+
+    Returns dict with: destination, origin, departure_date, return_date,
+    travelers, budget, preferences
+    """
+    # Use columns for compact layout
+    col1, col2 = st.columns(2)
+
+    with col1:
+        destination = st.text_input(
+            "Where to?",
+            placeholder="Paris, France",
+            key="trip_destination"
+        )
+
+        departure_date = st.date_input(
+            "Departure",
+            value=date.today() + timedelta(days=30),
+            min_value=date.today(),
+            key="trip_departure_date"
+        )
+
+    with col2:
+        origin = st.text_input(
+            "From",
+            placeholder="Los Angeles, CA (optional)",
+            key="trip_origin"
+        )
+
+        return_date = st.date_input(
+            "Return",
+            value=date.today() + timedelta(days=37),
+            min_value=date.today(),
+            key="trip_return_date"
+        )
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        travelers = st.selectbox(
+            "Travelers",
+            options=["1 adult", "2 adults", "2 adults, 1 child", "2 adults, 2 children", "Family (4+)", "Group (5+)"],
+            key="trip_travelers"
+        )
+
+    with col4:
+        budget = st.slider(
+            "Budget (USD)",
+            min_value=500,
+            max_value=20000,
+            value=3000,
+            step=500,
+            format="$%d",
+            key="trip_budget"
+        )
+
+    # Preferences - the "conversational" part
+    preferences = st.text_area(
+        "Preferences (optional)",
+        placeholder="e.g., boutique hotels, food tours, avoid tourist traps, interested in art museums...",
+        height=80,
+        key="trip_preferences"
+    )
+
+    return {
+        "destination": destination,
+        "origin": origin,
+        "departure_date": departure_date,
+        "return_date": return_date,
+        "travelers": travelers,
+        "budget": budget,
+        "preferences": preferences
+    }
+
+
 def _get_default_expert_selection():
-    """Get default expert selection for palliative surgery questions."""
-    # Default to 4 most common experts for palliative surgery questions
+    """Get default expert selection for travel questions."""
+    # Default to 4 most common experts for travel planning
     return [
-        "Surgical Oncologist",
-        "Palliative Care Physician",
-        "GRADE Methodologist",
-        "GDG Chair"
+        "Budget Advisor",
+        "Logistics Planner",
+        "Activity Curator",
+        "Local Culture Guide"
     ]
 
 
@@ -156,9 +233,7 @@ def _render_realtime_expert_chips(question: str):
     Render real-time expert chips based on question text.
     Uses st.pills() with multi-select for small clickable chips.
     """
-    from core.question_templates import QUESTION_TYPES
-
-    # Detect question type from current text (simple keyword-based)
+    # Detect question type from current text
     # Only auto-select when question looks complete (ends with ? or . or is long enough)
     detected_type = "general"
     question_complete = False
@@ -172,17 +247,8 @@ def _render_realtime_expert_chips(question: str):
         )
 
         if question_complete and len(question_stripped) > 10:
-            question_lower = question.lower()
-            if any(kw in question_lower for kw in ["surgery", "surgical", "operative", "resection"]):
-                detected_type = "surgical_candidate"
-            elif any(kw in question_lower for kw in ["stent", "embolization", "interventional"]):
-                detected_type = "intervention_choice"
-            elif any(kw in question_lower for kw in ["pain", "symptom", "nausea", "obstruction"]):
-                detected_type = "symptom_management"
-            elif any(kw in question_lower for kw in ["ethics", "consent", "appropriate"]):
-                detected_type = "ethics_review"
-            elif any(kw in question_lower for kw in ["prognosis", "survival", "outcome", "mortality", "risk", "outcomes", "complication"]):
-                detected_type = "prognosis_assessment"
+            # Use travel question type detection
+            detected_type = detect_travel_question_type(question)
 
     # Get previous detected type to check for changes
     previous_type = st.session_state.get('detected_question_type', None)
@@ -192,22 +258,23 @@ def _render_realtime_expert_chips(question: str):
     st.session_state.detected_question_type = detected_type
 
     # Get all experts and auto-selection based on type
-    all_experts = list(GDG_PERSONAS.keys())
+    all_experts = list(TRAVEL_EXPERTS.keys())
 
     # Map question types to presets
     type_to_preset = {
-        "surgical_candidate": "Surgical Candidacy",
-        "intervention_choice": "Intervention Choice",
-        "symptom_management": "Symptom Management",
-        "ethics_review": "Ethics Review",
-        "prognosis_assessment": "Prognosis & Outcomes",
-        "palliative_pathway": "Palliative Pathway",
-        "resource_allocation": "Resource & Implementation",
-        "general": "Full GDG Panel"
+        "destination_planning": "Full Trip Planning",
+        "budget_optimization": "Budget Focus",
+        "activity_search": "Activities & Entertainment",
+        "food_guide": "Food & Dining",
+        "accommodation_search": "Accommodation",
+        "safety_check": "Safety & Health",
+        "weather_planning": "Weather Planning",
+        "flight_search": "Transportation",
+        "general": "Full Panel"
     }
 
-    preset_name = type_to_preset.get(detected_type, "Surgical Candidacy")
-    preset = GDG_PRESETS.get(preset_name, {})
+    preset_name = type_to_preset.get(detected_type, "Full Trip Planning")
+    preset = TRAVEL_PRESETS.get(preset_name, {})
     auto_experts = preset.get("experts", [])
 
     # Check if user has manually edited experts
@@ -232,9 +299,9 @@ def _render_realtime_expert_chips(question: str):
         current_selection = valid_selection
 
     # Get type info for display
-    type_info = QUESTION_TYPES.get(detected_type, {})
-    type_name = type_info.get('name', 'GDG Question')
-    type_icon = type_info.get('icon', '🏥')
+    type_info = TRAVEL_QUESTION_TYPES.get(detected_type, {})
+    type_name = type_info.get('name', 'Travel Question')
+    type_icon = type_info.get('icon', '✈️')
 
     # Show detected type badge
     if question and len(question.strip()) > 10:
@@ -381,13 +448,13 @@ def _render_project_chips():
 
 
 def _render_question_input():
-    """Render the question input with type selector."""
+    """Render the question input with trip form."""
 
     # Centered header
     st.markdown("""
     <div class="centered-header">
-        <h1>Ask the GDG</h1>
-        <p>Ask a palliative surgery question. I'll search evidence, consult the GDG panel, and synthesize a recommendation.</p>
+        <h1>Plan Your Trip</h1>
+        <p>Fill in your trip details below. I'll fetch real weather and flight data, then consult expert advisors.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -400,14 +467,18 @@ def _render_question_input():
 
         st.markdown("")  # Spacing
 
-        # Main question input
-        question = st.text_area(
-            "Your Question",
-            placeholder="e.g., When is surgical bypass preferred over stenting for malignant bowel obstruction?",
-            height=130,
-            key="home_question_input",
-            label_visibility="collapsed"
-        )
+        # Trip form - structured inputs for destination, dates, etc.
+        trip_form = _render_trip_form()
+
+        # Store form data in session state for button handler
+        st.session_state['trip_form'] = trip_form
+
+        # Build question from form for expert chips detection
+        question = ""
+        if trip_form.get("destination"):
+            question = f"Plan a trip to {trip_form['destination']}"
+            if trip_form.get("preferences"):
+                question += f". {trip_form['preferences']}"
 
         # Expert chips - small clickable multi-select pills (hidden in Quick Answer mode)
         if not st.session_state.get('quick_answer_mode', False):
@@ -478,7 +549,7 @@ def _render_question_input():
                         st.error(user_friendly_error(e, "fetching URL"))
 
             with context_tab4:
-                st.caption("Upload figures for AI analysis (KM curves, tumor data, heatmaps, etc.)")
+                st.caption("Upload photos for AI analysis (maps, itineraries, destination images, etc.)")
                 uploaded_images = st.file_uploader(
                     "Drop images here",
                     type=['png', 'jpg', 'jpeg', 'gif', 'webp'],
@@ -526,7 +597,7 @@ def _render_question_input():
             "Quick Answer",
             value=previous_quick_mode,
             key="quick_answer_toggle",
-            help="General AI response (~5s) without expert panel. Toggle off for full GDG panel discussion (~60s)."
+            help="General AI response (~5s) without expert panel. Toggle off for full expert panel discussion (~60s)."
         )
         st.session_state['quick_answer_mode'] = quick_mode
 
@@ -545,49 +616,57 @@ def _render_question_input():
             st.rerun()
 
         if quick_mode:
-            st.caption("General AI response with top PubMed results (no expert panel)")
+            st.caption("General AI response with web search (no expert panel)")
         else:
-            st.caption("Expert-first approach: Experts provide insights with supporting case series")
+            st.caption("Expert-first approach: Travel advisors provide insights with real-time data")
 
         # Research buttons - BELOW add context
         st.markdown("")  # Spacing
         sub_col1, sub_col2, sub_col3 = st.columns([1, 2, 1])
         with sub_col2:
-            button_label = "Get Quick Answer" if quick_mode else "Research"
-            button_icon = "" if quick_mode else ""
+            button_label = "Get Quick Answer" if quick_mode else "Plan My Trip"
 
             if st.button(
-                f"{button_icon} {button_label}",
+                f"{button_label}",
                 type="primary",
                 use_container_width=True,
                 key="research_btn"
             ):
-                question = st.session_state.get('home_question_input', '')
-                if question and question.strip():
+                # Get trip form data
+                trip_form = st.session_state.get('trip_form', {})
+                destination = trip_form.get('destination', '')
+
+                if not destination:
+                    st.warning("Please enter a destination to plan your trip.")
+                else:
+                    # Build question from form
+                    question = f"Plan a trip to {destination}"
+                    if trip_form.get('origin'):
+                        question += f" from {trip_form['origin']}"
+
                     # Get selected experts from chips
                     selected_experts = st.session_state.get('selected_experts_list', [])
-                    detected_type = st.session_state.get('detected_question_type', 'general')
 
                     if quick_mode:
                         _execute_quick_answer(question, context)
                     elif not selected_experts:
-                        st.warning("Please select at least one expert. Finish typing your question (end with ? or .) to auto-select, or click expert chips manually.")
+                        st.warning("Please select at least one expert.")
                     else:
-                        _execute_research(question, detected_type, context, selected_experts)
+                        _execute_research(question, "destination_planning", context, selected_experts, trip_form)
 
         # Recent questions section (below main input)
         _render_recent_questions()
 
 
-def _execute_research(question: str, question_type: Optional[str], context: Optional[str] = None, selected_experts: Optional[list] = None):
+def _execute_research(question: str, question_type: Optional[str], context: Optional[str] = None, selected_experts: Optional[list] = None, trip_form: Optional[Dict] = None):
     """Execute Pass 1 of the research workflow (experts only)."""
 
-    # Check for API key - use Google API key for Gemini models, otherwise OpenAI
+    # Check for API key - use Gemini API key for Gemini models, otherwise OpenAI
     model = getattr(settings, 'EXPERT_MODEL', '')
     if model and model.lower().startswith('gemini'):
-        api_key = getattr(settings, 'GOOGLE_API_KEY', None)
+        api_key = getattr(settings, 'GEMINI_API_KEY', None)
         if not api_key:
-            st.error("Google API key not configured. Please set GOOGLE_API_KEY in your .env file.")
+            st.error("Gemini API key not configured. Please set GEMINI_API_KEY in your .env file.")
             return
     else:
         api_key = getattr(settings, 'OPENAI_API_KEY', None)
@@ -595,11 +674,33 @@ def _execute_research(question: str, question_type: Optional[str], context: Opti
             st.error("OpenAI API key not configured. Please set OPENAI_API_KEY in your .env file.")
             return
 
+    # Fetch real travel data if form provided
+    enriched_context = context or ""
+
+    if trip_form and trip_form.get("destination"):
+        with st.spinner("Fetching weather and flight data..."):
+            try:
+                from services.travel_data_service import get_travel_data_context
+                api_context = get_travel_data_context(trip_form)
+                if api_context:
+                    enriched_context = api_context + "\n\n" + enriched_context
+                    st.success("Real-time data loaded!")
+            except Exception as e:
+                st.warning(f"Could not fetch travel data: {e}")
+
+        # Add preferences to question if provided
+        if trip_form.get("preferences"):
+            question = f"{question}\n\nPreferences: {trip_form['preferences']}"
+
     # Store current question and context
     st.session_state.current_question = question
-    st.session_state.current_context = context
+    st.session_state.current_context = enriched_context
     st.session_state.processing_stage = "starting"
     st.session_state.user_selected_experts = selected_experts
+
+    # Store destination for place enrichment
+    if trip_form:
+        st.session_state.current_destination = trip_form.get('destination', '')
 
     # Initialize service
     service = ResearchPartnerService(api_key=api_key)
@@ -613,7 +714,7 @@ def _execute_research(question: str, question_type: Optional[str], context: Opti
             for event in service.run_research_flow(
                 question=question,
                 question_type=question_type,
-                additional_context=context if context else None,
+                additional_context=enriched_context if enriched_context else None,
                 project_id=st.session_state.get('current_project_id'),
                 selected_experts=selected_experts
             ):
@@ -782,7 +883,7 @@ def _render_quick_answer_view():
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("Run Full GDG Discussion", type="primary", use_container_width=True):
+        if st.button("Run Full Expert Panel", type="primary", use_container_width=True):
             # Switch to full research mode
             st.session_state['quick_answer_mode'] = False
             _execute_research(question, None, st.session_state.get('current_context'))
@@ -869,7 +970,7 @@ def _execute_validation():
     # Get API key
     model = getattr(settings, 'EXPERT_MODEL', '')
     if model and model.lower().startswith('gemini'):
-        api_key = getattr(settings, 'GOOGLE_API_KEY', None)
+        api_key = getattr(settings, 'GEMINI_API_KEY', None)
     else:
         api_key = getattr(settings, 'OPENAI_API_KEY', None)
 
@@ -1056,8 +1157,8 @@ def _render_recent_questions():
         preview = entry.get('recommendation_preview', '')[:80]
 
         # Get type info for icon
-        type_info = QUESTION_TYPES.get(q_type, {})
-        icon = type_info.get('icon', '')
+        type_info = TRAVEL_QUESTION_TYPES.get(q_type, {})
+        icon = type_info.get('icon', '✈️')
 
         # Confidence badge color
         conf_colors = {'HIGH': '#28a745', 'MEDIUM': '#ffc107', 'LOW': '#dc3545'}
@@ -1162,7 +1263,7 @@ def _render_inline_chat(result):
         # 2. Get API Key (copying logic from _execute_research)
         model = getattr(settings, 'EXPERT_MODEL', '')
         if model and model.lower().startswith('gemini'):
-            api_key = getattr(settings, 'GOOGLE_API_KEY', None)
+            api_key = getattr(settings, 'GEMINI_API_KEY', None)
         else:
             api_key = getattr(settings, 'OPENAI_API_KEY', None)
             
@@ -1199,12 +1300,12 @@ def _render_inline_chat(result):
                 except Exception as e:
                     st.error(user_friendly_error(e, "generating response"))
 
-        # Get API key - use Google API key for Gemini models
+        # Get API key - use Gemini API key for Gemini models
         model = getattr(settings, 'EXPERT_MODEL', '')
         if model and model.lower().startswith('gemini'):
-            api_key = getattr(settings, 'GOOGLE_API_KEY', None)
+            api_key = getattr(settings, 'GEMINI_API_KEY', None)
             if not api_key:
-                st.error("Google API key not configured.")
+                st.error("Gemini API key not configured.")
                 return
         else:
             api_key = getattr(settings, 'OPENAI_API_KEY', None)

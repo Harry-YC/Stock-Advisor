@@ -12,7 +12,7 @@ Data Sources:
 """
 
 from typing import Dict, Optional
-from datetime import date
+from datetime import date, timedelta
 import logging
 
 from config import settings
@@ -62,13 +62,14 @@ class TravelDataService:
         Fetch all available travel data.
 
         Returns:
-            Dict with keys: 'weather', 'flights', 'car_rentals', 'hotels', 'summary'
+            Dict with keys: 'weather', 'flights', 'car_rentals', 'hotels', 'dining', 'summary'
         """
         results = {
             "weather": "",
             "flights": "",
             "car_rentals": "",
             "hotels": "",
+            "dining": "",
             "summary": ""
         }
 
@@ -97,16 +98,8 @@ class TravelDataService:
             except Exception as e:
                 logger.warning(f"Flight fetch failed: {e}")
 
-        # Fetch car rentals
-        try:
-            car_data = self._fetch_car_rentals(
-                destination, departure_date, return_date
-            )
-            results["car_rentals"] = car_data
-            if car_data:
-                logger.info(f"Car rental data fetched for {destination}")
-        except Exception as e:
-            logger.warning(f"Car rental fetch failed: {e}")
+        # Car rentals - on demand only (not auto-fetched)
+        # User can request with "show car rentals" command
 
         # Fetch hotels using Maps Grounding (Gemini 2.5 Flash)
         if settings.ENABLE_MAPS_GROUNDING:
@@ -119,6 +112,16 @@ class TravelDataService:
                     logger.info(f"Hotel data fetched for {destination} via Maps Grounding")
             except Exception as e:
                 logger.warning(f"Hotel fetch failed: {e}")
+
+        # Fetch dining/restaurants using Maps Grounding
+        if settings.ENABLE_MAPS_GROUNDING:
+            try:
+                dining_data = self._fetch_dining(destination, budget)
+                results["dining"] = dining_data
+                if dining_data:
+                    logger.info(f"Dining data fetched for {destination} via Maps Grounding")
+            except Exception as e:
+                logger.warning(f"Dining fetch failed: {e}")
 
         # Build summary
         results["summary"] = self._build_summary(
@@ -137,15 +140,67 @@ class TravelDataService:
         return 2  # default
 
     def _fetch_weather(self, destination: str, start: date, end: date) -> str:
-        """Fetch weather forecast for destination."""
+        """Fetch weather forecast or historical climate data for destination."""
+        from datetime import date as date_type
+
+        # Check if departure is within forecast window (typically 5-7 days)
+        days_until_departure = (start - date_type.today()).days
+        forecast_window = 5  # OpenWeatherMap free tier limit
+
+        if days_until_departure > forecast_window:
+            # Trip is too far out - fetch historical climate data instead
+            return self._fetch_historical_weather(destination, start, end)
+
         days = (end - start).days + 1
-        days = min(days, 5)  # OpenWeatherMap free tier limit
+        days = min(days, forecast_window)
 
         forecasts = self.weather_client.get_forecast(city=destination, days=days)
         if not forecasts:
             return ""
 
         return self.weather_client.format_forecast(forecasts)
+
+    def _fetch_historical_weather(self, destination: str, start: date, end: date) -> str:
+        """Fetch historical weather patterns using LLM knowledge."""
+        try:
+            from services.llm_router import get_llm_router
+            router = get_llm_router()
+
+            month_name = start.strftime("%B")
+            duration = (end - start).days
+
+            prompt = f"""Provide historical weather data for {destination} during {month_name}.
+
+Format as a markdown table with these columns:
+| Aspect | Typical Conditions |
+|--------|-------------------|
+| Average High | XX°F (XX°C) |
+| Average Low | XX°F (XX°C) |
+| Rainfall | XX inches / XX days of rain |
+| Humidity | XX% |
+| Sunshine | XX hours/day |
+| Best For | (activities suited to this weather) |
+
+Then add 2-3 bullet points for packing recommendations specific to {destination} in {month_name}.
+
+Keep response concise - just the table and packing tips. No introductory text."""
+
+            response_text = ""
+            for chunk in router.call_expert_stream(
+                prompt=prompt,
+                system="You are a climate and weather expert. Provide accurate historical weather data based on long-term averages. Be concise and factual."
+            ):
+                if chunk.get("type") == "chunk":
+                    response_text += chunk.get("content", "")
+
+            if response_text:
+                return f"**Historical Weather for {destination} in {month_name}**\n*(Real-time forecast available closer to your trip)*\n\n{response_text.strip()}"
+            else:
+                return ""
+
+        except Exception as e:
+            logger.warning(f"Historical weather fetch failed: {e}")
+            return ""
 
     def _fetch_flights(
         self, origin: str, destination: str,
@@ -247,6 +302,159 @@ Focus on hotels with high ratings (4.0+) and good value for the budget."""
             logger.warning(f"Maps grounding hotel fetch failed: {e}")
             return ""
 
+    def _fetch_dining(self, destination: str, budget: int) -> str:
+        """
+        Fetch restaurant recommendations using Google Maps Grounding.
+
+        Uses Gemini with Maps grounding to get real restaurant data
+        including ratings, reviews, and cuisine types.
+        """
+        try:
+            from integrations.google_search import TravelGroundingClient
+        except ImportError:
+            logger.warning("TravelGroundingClient not available for dining")
+            return ""
+
+        client = TravelGroundingClient()
+        if not client.is_available():
+            return ""
+
+        prompt = f"""Find the TOP 5 recommended restaurants in {destination}.
+
+Include a mix of:
+- Local cuisine / traditional food
+- Popular with tourists
+- Different price ranges (budget to upscale)
+
+For each restaurant provide:
+1. Restaurant name and cuisine type
+2. Google rating and review count
+3. Price range ($-$$$$)
+4. What it's known for / signature dishes
+5. Best for (romantic dinner, family, quick bite, etc.)
+
+Focus on highly-rated restaurants (4.0+) with authentic local experiences."""
+
+        try:
+            result = client.generate_with_travel_grounding(
+                prompt=prompt,
+                destination=destination,
+                include_maps=True,
+                include_search=False,
+                model=settings.MAPS_GROUNDING_MODEL
+            )
+            return result.content if result.content else ""
+        except Exception as e:
+            logger.warning(f"Maps grounding dining fetch failed: {e}")
+            return ""
+
+    def fetch_car_rentals_on_demand(
+        self, destination: str, pickup: date, dropoff: date
+    ) -> str:
+        """Fetch car rentals when explicitly requested by user."""
+        try:
+            return self._fetch_car_rentals(destination, pickup, dropoff)
+        except Exception as e:
+            logger.warning(f"Car rental fetch failed: {e}")
+            return "Car rental data unavailable. Please try again later."
+
+    def fetch_safety_advisories(self, destination: str) -> str:
+        """
+        Fetch current travel advisories using Google Search grounding.
+
+        Searches for:
+        - Government travel advisories (US, UK, AU)
+        - Visa requirements
+        - Health requirements & vaccination rules
+        - Current safety warnings
+
+        Returns:
+            Formatted string with advisory information, or empty string if unavailable.
+        """
+        try:
+            from integrations.google_search import search_with_grounding
+        except ImportError:
+            logger.warning("Google Search grounding not available")
+            return ""
+
+        query = f"""Current travel advisory for {destination}:
+1. Official government travel advisories (US State Dept, UK FCDO, etc.)
+2. Visa requirements for US citizens
+3. Health requirements (vaccinations, COVID rules if any)
+4. Current safety concerns or warnings
+5. Any travel restrictions
+
+Provide only CURRENT, VERIFIED information from official sources."""
+
+        system_context = """You are a travel safety expert. Provide factual, current information from official government sources.
+Format the response with clear sections:
+- **Travel Advisory Level**: (e.g., Level 1-4 for US State Dept)
+- **Visa Requirements**: Brief summary for US citizens
+- **Health Requirements**: Current vaccination/health rules
+- **Safety Notes**: Any current concerns
+Include source names but not full URLs. Be concise."""
+
+        try:
+            result, sources = search_with_grounding(
+                question=query,
+                system_context=system_context,
+                max_sources=5
+            )
+
+            if result:
+                # Add source attribution
+                source_names = [s.get('title', 'Web')[:50] for s in sources[:3]]
+                if source_names:
+                    result += f"\n\n*Sources: {', '.join(source_names)}*"
+                return result
+            return ""
+
+        except Exception as e:
+            logger.warning(f"Safety advisory fetch failed: {e}")
+            return ""
+
+    def fetch_current_events(self, destination: str, departure_date: date) -> str:
+        """
+        Fetch current events and news for destination around travel dates.
+
+        Useful for:
+        - Festivals, holidays, major events
+        - Strikes, protests, disruptions
+        - Recent news affecting travel
+
+        Returns:
+            Formatted string with event information.
+        """
+        try:
+            from integrations.google_search import search_with_grounding
+        except ImportError:
+            return ""
+
+        month_name = departure_date.strftime("%B %Y")
+        query = f"""What's happening in {destination} in {month_name}?
+- Major events, festivals, holidays
+- Any strikes, protests, or disruptions
+- Recent news affecting tourists
+- Special occasions or celebrations"""
+
+        system_context = """You are a travel events expert. Provide current information about events and news.
+Format as a brief bulleted list. Focus on:
+- Events tourists should know about (festivals, holidays)
+- Potential disruptions (strikes, closures)
+- Opportunities (special events, seasonal activities)
+Be concise - max 5-6 bullet points."""
+
+        try:
+            result, _ = search_with_grounding(
+                question=query,
+                system_context=system_context,
+                max_sources=5
+            )
+            return result if result else ""
+        except Exception as e:
+            logger.warning(f"Current events fetch failed: {e}")
+            return ""
+
     def _build_summary(
         self, destination: str, start: date, end: date,
         travelers: str, budget: int, data: Dict
@@ -261,11 +469,8 @@ Focus on hotels with high ratings (4.0+) and good value for the budget."""
 - **Budget**: ${budget:,} USD
 
 """
-        if data.get("weather"):
-            summary += f"""## WEATHER FORECAST (Real Data)
-{data['weather']}
-
-"""
+        # Priority order: Flights → Hotels → Dining → Weather
+        # Car rentals are on-demand only (not shown by default)
 
         if data.get("flights"):
             summary += f"""## FLIGHT OPTIONS (Real Prices)
@@ -273,15 +478,21 @@ Focus on hotels with high ratings (4.0+) and good value for the budget."""
 
 """
 
-        if data.get("car_rentals"):
-            summary += f"""## CAR RENTAL OPTIONS (Top 3 Recommendations)
-{data['car_rentals']}
-
-"""
-
         if data.get("hotels"):
             summary += f"""## HOTEL OPTIONS (Google Maps Data)
 {data['hotels']}
+
+"""
+
+        if data.get("dining"):
+            summary += f"""## DINING & RESTAURANTS (Google Maps Data)
+{data['dining']}
+
+"""
+
+        if data.get("weather"):
+            summary += f"""## WEATHER FORECAST (Real Data)
+{data['weather']}
 
 """
 

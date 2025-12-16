@@ -1,90 +1,56 @@
 """
-Services Layer
+Services Layer for Travel Planner
 
-Business logic services separated from UI components.
+Business logic services for the travel planning application.
 
-This module provides the main service classes for:
-- Expert discussions and GDG panel management
-- Analysis (gap analysis, conflict detection, synthesis)
-- Chat and research partner functionality
-- Search and literature retrieval
-- Recommendations and EtD framework
-- LLM routing
+Services:
+- expert_service: AI travel expert panel discussions
+- travel_data_service: Weather, flights, car rentals, hotels
+- place_enrichment_service: Google Places ratings and trust scores
+- excel_export_service: Export trip plans to Excel
+- llm_router: Routes LLM calls to appropriate models
 
 Usage:
     from services import (
         ExpertDiscussionService,
-        AnalysisService,
-        SearchService,
-        RecommendationService,
-        EtDService,
+        TravelDataService,
+        PlaceEnrichmentService,
         LLMRouter,
     )
 """
 
-# Core expert services
+# Expert panel service
 from services.expert_service import ExpertDiscussionService, DiscussionRoundResult
 
-# Analysis services
-from services.analysis_service import AnalysisService
+# Travel data fetching
+from services.travel_data_service import TravelDataService, get_travel_data_context
 
-# Chat services
-from services.chat_service import ChatService, ResearchAgent
+# Place enrichment with Google Places
+from services.place_enrichment_service import PlaceEnrichmentService, EnrichedPlace
 
-# Search services
-from services.search_service import SearchService
-
-# Recommendation services
-from services.recommendation_service import (
-    RecommendationService,
-    Recommendation,
-    get_recommendation_service,
-)
-
-# Evidence-to-Decision services
-from services.etd_service import (
-    EtDService,
-    EvidenceToDecision,
-    DomainJudgment,
-    get_etd_service,
-)
+# Excel export
+from services.excel_export_service import ExcelExportService
 
 # LLM routing
 from services.llm_router import LLMRouter, get_llm_router
-
-# Follow-up services
-from services.follow_up_service import FollowUpService
 
 __all__ = [
     # Expert services
     'ExpertDiscussionService',
     'DiscussionRoundResult',
 
-    # Analysis
-    'AnalysisService',
+    # Travel data
+    'TravelDataService',
+    'get_travel_data_context',
 
-    # Chat
-    'ChatService',
-    'ResearchAgent',
+    # Place enrichment
+    'PlaceEnrichmentService',
+    'EnrichedPlace',
 
-    # Search
-    'SearchService',
-
-    # Recommendations
-    'RecommendationService',
-    'Recommendation',
-    'get_recommendation_service',
-
-    # EtD Framework
-    'EtDService',
-    'EvidenceToDecision',
-    'DomainJudgment',
-    'get_etd_service',
+    # Excel export
+    'ExcelExportService',
 
     # LLM
     'LLMRouter',
     'get_llm_router',
-
-    # Follow-up
-    'FollowUpService',
 ]
