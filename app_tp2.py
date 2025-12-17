@@ -107,27 +107,6 @@ def get_next_question(trip_info: dict) -> Optional[str]:
     return None  # All essentials collected!
 
 
-def format_trip_summary(trip_info: dict) -> str:
-    """Format collected trip info as a nice summary."""
-    dest = trip_info.get("destination", "TBD")
-    dates = trip_info.get("dates", "")
-    duration = trip_info.get("duration_days")
-    travelers = trip_info.get("travelers", "TBD")
-    budget = trip_info.get("budget")
-
-    date_str = dates if dates else f"{duration} days" if duration else "TBD"
-    budget_str = f"${budget:,}" if budget else "TBD"
-
-    return f"""**Here's what I've got:**
-
-📍 **Destination:** {dest}
-📅 **When:** {date_str}
-👥 **Travelers:** {travelers}
-💰 **Budget:** {budget_str}
-
-Does this look right?"""
-
-
 async def handle_intake_message(message: str):
     """Handle messages during the intake conversation phase."""
     trip_info = cl.user_session.get("trip_info", {})
@@ -158,20 +137,11 @@ async def handle_intake_message(message: str):
         # Still need more info
         await cl.Message(content=next_question).send()
     else:
-        # All essentials collected - show confirmation
-        await show_trip_confirmation(trip_info)
-
-
-async def show_trip_confirmation(trip_info: dict):
-    """Show trip summary and ask for confirmation."""
-    summary = format_trip_summary(trip_info)
-
-    actions = [
-        cl.Action(name="plan_trip", label="✅ Yes, plan my trip!", value="plan", payload={"action": "plan"}),
-        cl.Action(name="adjust_trip", label="✏️ Let me adjust", value="adjust", payload={"action": "adjust"}),
-    ]
-
-    await cl.Message(content=summary, actions=actions).send()
+        # All essentials collected - proceed directly to planning
+        trip_config = convert_trip_info_to_config(trip_info)
+        cl.user_session.set("trip_config", trip_config)
+        cl.user_session.set("intake_mode", False)
+        await handle_plan_trip(trip_config)
 
 
 def convert_trip_info_to_config(trip_info: dict) -> dict:
@@ -259,29 +229,6 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
         "budget": trip_info.get("budget", 5000),
         "preset": "Quick Trip Planning"
     }
-
-
-@cl.action_callback("plan_trip")
-async def on_plan_trip_action(action: cl.Action):
-    """Handle 'Yes, plan my trip!' button click."""
-    trip_info = cl.user_session.get("trip_info", {})
-    trip_config = convert_trip_info_to_config(trip_info)
-
-    cl.user_session.set("trip_config", trip_config)
-    cl.user_session.set("intake_mode", False)
-
-    await cl.Message(content="Great! Let me get my expert team working on your trip... 🧳").send()
-    await handle_plan_trip(trip_config)
-
-
-@cl.action_callback("adjust_trip")
-async def on_adjust_trip_action(action: cl.Action):
-    """Handle 'Let me adjust' button click."""
-    await cl.Message(
-        content="No problem! What would you like to change?\n\n"
-                "You can tell me naturally (e.g., 'Actually, make it Tokyo' or 'Budget should be $4000'), "
-                "or use the ⚙️ settings panel for precise control."
-    ).send()
 
 
 @cl.action_callback("ask_expert")
