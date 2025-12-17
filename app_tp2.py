@@ -56,7 +56,9 @@ Return JSON with these fields (use null if not mentioned):
   "return_date": "return/end date or null",
   "duration_days": number or null,
   "travelers": "description or null",
-  "budget": number or null
+  "budget": number or null,
+  "travel_style": "foodie/adventure/relaxation/cultural/budget/luxury or null",
+  "special_interests": "specific interests mentioned or null"
 }}
 
 IMPORTANT: Pay attention to words like "returning on", "back on", "until" - these indicate the RETURN date, not departure.
@@ -69,6 +71,8 @@ Examples:
 - "trip from Jan 6 to Jan 9" -> {{"destination": null, "origin": null, "departure_date": "Jan 6", "return_date": "Jan 9", "travelers": null, "budget": null, "duration_days": null}}
 - "trip to Paris from Taipei budget 5000" -> {{"destination": "Paris, France", "origin": "Taipei", "departure_date": null, "return_date": null, "travelers": null, "budget": 5000, "duration_days": null}}
 - "a week in mid-January" -> {{"destination": null, "origin": null, "departure_date": "mid-January", "return_date": null, "duration_days": 7, "travelers": null, "budget": null}}
+- "myself" or "just me" or "solo" -> {{"travelers": "1 adult (solo)"}}
+- "foodie trip" -> extract "foodie" as a travel style hint, not travelers
 
 Return ONLY the JSON object, nothing else."""
 
@@ -156,11 +160,85 @@ async def handle_intake_message(message: str):
         # Still need more info
         await cl.Message(content=next_question).send()
     else:
-        # All essentials collected - proceed directly to planning
-        trip_config = convert_trip_info_to_config(trip_info)
-        cl.user_session.set("trip_config", trip_config)
-        cl.user_session.set("intake_mode", False)
-        await handle_plan_trip(trip_config)
+        # All essentials collected - show confirmation before planning
+        await show_trip_confirmation(trip_info)
+
+
+async def show_trip_confirmation(trip_info: dict):
+    """Show extracted trip info and ask user to confirm before planning."""
+    # Convert to config to get parsed dates
+    trip_config = convert_trip_info_to_config(trip_info)
+
+    # Build confirmation message
+    destination = trip_info.get("destination", "Unknown")
+    origin = trip_info.get("origin", "")
+    travelers = trip_config.get("travelers", "2 adults")
+    budget = trip_config.get("budget", 5000)
+
+    # Parse dates for display
+    try:
+        departure = date.fromisoformat(trip_config.get("departure", ""))
+        return_date = date.fromisoformat(trip_config.get("return_date", ""))
+        duration = (return_date - departure).days + 1
+        date_str = f"{departure.strftime('%b %d')} - {return_date.strftime('%b %d, %Y')} ({duration} days)"
+    except:
+        date_str = "Dates need confirmation"
+
+    # Check if we have any travel style hints
+    travel_style = trip_info.get("travel_style", "")
+
+    confirmation_msg = f"""## ✅ Here's what I understood:
+
+| Field | Value |
+|-------|-------|
+| **Destination** | {destination} |
+| **Origin** | {origin or 'Not specified'} |
+| **Dates** | {date_str} |
+| **Travelers** | {travelers} |
+| **Budget** | ${budget:,} |
+| **Trip Style** | {travel_style or 'Not specified'} |
+
+**Does this look right?**
+
+If something's wrong, just tell me (e.g., "actually it's just me" or "departing from Tokyo").
+
+---
+
+**Optional - Help me give better recommendations:**
+- What's your travel style? (foodie, adventure, relaxation, cultural, budget backpacker)
+- Any must-see attractions or activities?
+- Dietary restrictions or accessibility needs?
+
+*Just type any details, or click a button below to continue.*"""
+
+    actions = [
+        cl.Action(name="plan_trip", label="✅ Yes, plan my trip!", value="confirm", payload={}),
+        cl.Action(name="adjust_trip", label="✏️ Let me adjust", value="adjust", payload={}),
+    ]
+
+    await cl.Message(content=confirmation_msg, actions=actions).send()
+
+
+@cl.action_callback("plan_trip")
+async def on_plan_trip(action: cl.Action):
+    """User confirmed trip details - proceed with planning."""
+    trip_info = cl.user_session.get("trip_info", {})
+    trip_config = convert_trip_info_to_config(trip_info)
+    cl.user_session.set("trip_config", trip_config)
+    cl.user_session.set("intake_mode", False)
+    await handle_plan_trip(trip_config)
+
+
+@cl.action_callback("adjust_trip")
+async def on_adjust_trip(action: cl.Action):
+    """User wants to adjust - prompt them to make corrections."""
+    await cl.Message(
+        content="No problem! Just tell me what needs to be changed, for example:\n"
+                "- \"Actually it's just me traveling\"\n"
+                "- \"I'm flying from Tokyo\"\n"
+                "- \"The dates are Jan 10-15\"\n"
+                "- \"Budget is $3000\""
+    ).send()
 
 
 def parse_flexible_date(date_str: str, default_year: int = None) -> date:
@@ -372,7 +450,10 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
     # Map travelers string to select value
     travelers_str = trip_info.get("travelers", "2 adults")
     travelers_lower = travelers_str.lower() if travelers_str else ""
-    if "1" in travelers_lower or "solo" in travelers_lower or "alone" in travelers_lower:
+
+    # Solo traveler indicators
+    solo_indicators = ["1", "solo", "alone", "myself", "just me", "by myself", "single", "one person", "one adult"]
+    if any(ind in travelers_lower for ind in solo_indicators):
         travelers = "1 adult"
     elif "child" in travelers_lower or "kid" in travelers_lower or "family" in travelers_lower:
         if "2" in travelers_lower:
@@ -381,6 +462,10 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
             travelers = "2 adults + 1 child"
     elif "group" in travelers_lower or "4" in travelers_lower or "5" in travelers_lower:
         travelers = "Group (4+)"
+    elif "couple" in travelers_lower or "wife" in travelers_lower or "husband" in travelers_lower or "partner" in travelers_lower:
+        travelers = "2 adults"
+    elif "3" in travelers_lower or "three" in travelers_lower:
+        travelers = "Group (4+)"  # Closest match for 3 people
     else:
         travelers = "2 adults"
 
@@ -391,7 +476,9 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
         "return_date": return_date.isoformat(),
         "travelers": travelers,
         "budget": trip_info.get("budget", 5000),
-        "preset": "Quick Trip Planning"
+        "preset": "Quick Trip Planning",
+        "travel_style": trip_info.get("travel_style", ""),
+        "special_interests": trip_info.get("special_interests", ""),
     }
 
 
@@ -904,14 +991,26 @@ async def handle_plan_trip(trip_config: Dict):
     preset = TRAVEL_PRESETS.get(preset_name, TRAVEL_PRESETS["Quick Trip Planning"])
     selected_experts = preset["experts"]
 
-    # Show planning started
-    await cl.Message(
-        content=f"## Planning your trip to {destination}\n\n"
-                f"**Dates:** {departure.strftime('%b %d')} - {return_date.strftime('%b %d, %Y')}\n"
-                f"**Budget:** ${trip_config.get('budget', 5000):,}\n"
-                f"**Experts:** {', '.join(selected_experts)}\n\n"
-                f"Fetching real-time data..."
-    ).send()
+    # Build planning message with optional details
+    travel_style = trip_config.get("travel_style", "")
+    special_interests = trip_config.get("special_interests", "")
+    origin = trip_config.get("origin", "")
+
+    planning_lines = [
+        f"## Planning your trip to {destination}\n",
+        f"**Dates:** {departure.strftime('%b %d')} - {return_date.strftime('%b %d, %Y')}",
+        f"**Budget:** ${trip_config.get('budget', 5000):,}",
+    ]
+    if origin:
+        planning_lines.append(f"**Flying from:** {origin}")
+    if travel_style:
+        planning_lines.append(f"**Style:** {travel_style}")
+    if special_interests:
+        planning_lines.append(f"**Interests:** {special_interests}")
+    planning_lines.append(f"**Experts:** {', '.join(selected_experts)}")
+    planning_lines.append("\nFetching real-time data...")
+
+    await cl.Message(content="\n".join(planning_lines)).send()
 
     # Fetch travel data
     async with cl.Step(name="Data Fetcher", type="tool") as step:
@@ -974,6 +1073,18 @@ async def handle_plan_trip(trip_config: Dict):
                 logger.warning(f"Current events fetch failed: {e}")
                 step.output = f"Events fetch failed: {e}"
 
+    # Build user preferences context
+    user_prefs = []
+    if origin:
+        user_prefs.append(f"- Flying from: {origin}")
+    user_prefs.append(f"- Travelers: {trip_config.get('travelers', '2 adults')}")
+    user_prefs.append(f"- Budget: ${trip_config.get('budget', 5000):,}")
+    if travel_style:
+        user_prefs.append(f"- Travel style: {travel_style}")
+    if special_interests:
+        user_prefs.append(f"- Special interests: {special_interests}")
+    user_prefs_context = "\n\n## USER PREFERENCES\n" + "\n".join(user_prefs) if user_prefs else ""
+
     # Run experts and stream responses
     expert_responses = {}
 
@@ -987,8 +1098,8 @@ async def handle_plan_trip(trip_config: Dict):
         # Add header with icon
         await msg.stream_token(f"## {icon} {expert_name}\n*{role}*\n\n")
 
-        # Build context with any Google Search data for this expert
-        expert_context = trip_data.get("summary", "")
+        # Build context with user prefs + trip data + any Google Search data
+        expert_context = user_prefs_context + "\n\n" + trip_data.get("summary", "")
         if expert_name in search_contexts:
             expert_context += search_contexts[expert_name]
 
