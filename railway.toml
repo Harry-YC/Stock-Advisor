@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "chainlit run app_tp2.py --host 0.0.0.0 --port $PORT"
+startCommand = "PYTHONPATH=/app:$PYTHONPATH chainlit run app_tp2.py --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

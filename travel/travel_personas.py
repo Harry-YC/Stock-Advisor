@@ -635,38 +635,32 @@ def call_travel_expert_stream(
         user_message += f"\n\n## Available Information:\n{evidence_context}"
 
     try:
-        from core.llm_utils import get_llm_client
+        from services.llm_router import get_llm_router
 
-        client = get_llm_client(api_key=openai_api_key, model=model)
+        router = get_llm_router()
         logger.info(f"Starting stream for travel expert {persona_name}")
 
-        stream = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            max_completion_tokens=max_completion_tokens,
-            stream=True
-        )
-
         chunk_count = 0
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
+        for chunk in router.call_expert_stream(
+            prompt=user_message,
+            system=system_prompt,
+            model=model,
+            max_tokens=max_completion_tokens
+        ):
+            if chunk.get('type') == 'chunk':
                 chunk_count += 1
-                yield {'type': 'chunk', 'content': chunk.choices[0].delta.content}
-
-            if chunk.choices and chunk.choices[0].finish_reason:
+                yield chunk
+            elif chunk.get('type') == 'complete':
                 logger.info(f"Stream complete for {persona_name}: {chunk_count} chunks")
                 yield {
                     'type': 'complete',
-                    'finish_reason': chunk.choices[0].finish_reason,
+                    'finish_reason': chunk.get('finish_reason', 'stop'),
                     'model': model
                 }
                 return
 
-        # If loop ends without finish_reason
-        yield {'type': 'complete', 'finish_reason': 'unknown', 'model': model}
+        # If loop ends without complete signal
+        yield {'type': 'complete', 'finish_reason': 'stop', 'model': model}
 
     except Exception as e:
         logger.error(f"Stream error for {persona_name}: {e}")
