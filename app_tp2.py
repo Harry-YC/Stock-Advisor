@@ -492,6 +492,172 @@ async def on_settings_update(settings_dict: Dict):
         ).send()
 
 
+async def handle_plan_update(uploaded_plan: str):
+    """Update an uploaded plan with current real-time data."""
+    from services.llm_router import get_llm_router
+
+    await cl.Message(content="Updating your plan with current data...").send()
+
+    # Extract destination from the plan
+    router = get_llm_router()
+    extract_prompt = f"""From this travel plan, extract ONLY the main destination city/country.
+Return just the destination name, nothing else.
+
+{uploaded_plan[:2000]}"""
+
+    destination = ""
+    for chunk in router.call_expert_stream(prompt=extract_prompt, system="Extract only the destination name."):
+        if chunk.get("type") == "chunk":
+            destination += chunk.get("content", "")
+
+    destination = destination.strip()
+
+    if destination:
+        # Create trip config from extracted info
+        from datetime import timedelta
+        trip_config = {
+            "destination": destination,
+            "departure": (date.today() + timedelta(days=30)).isoformat(),
+            "return_date": (date.today() + timedelta(days=37)).isoformat(),
+            "travelers": "2 adults",
+            "budget": 5000,
+            "preset": "Quick Trip Planning"
+        }
+        cl.user_session.set("trip_config", trip_config)
+        cl.user_session.set("intake_mode", False)
+
+        await cl.Message(content=f"Found destination: **{destination}**. Fetching current data...").send()
+        await handle_plan_trip(trip_config)
+    else:
+        await cl.Message(content="I couldn't identify the destination. Please tell me where you're planning to go.").send()
+
+
+async def handle_plan_improvement(uploaded_plan: str):
+    """Suggest improvements to an uploaded travel plan."""
+    from services.llm_router import get_llm_router
+
+    await cl.Message(content="Analyzing your plan for improvements...").send()
+
+    router = get_llm_router()
+
+    improvement_prompt = f"""Review this travel plan and suggest specific improvements:
+
+{uploaded_plan[:6000]}
+
+Provide actionable suggestions in these areas:
+1. **Itinerary Optimization** - Better order, timing, or pacing
+2. **Hidden Gems** - Lesser-known alternatives to tourist traps
+3. **Cost Savings** - Ways to reduce expenses
+4. **Logistics** - Transportation, timing, or booking tips
+5. **Missing Elements** - What should be added
+
+Be specific and practical. Reference actual places and times from their plan."""
+
+    async with cl.Step(name="Improvement Advisor", type="tool") as step:
+        improvements = ""
+        for chunk in router.call_expert_stream(
+            prompt=improvement_prompt,
+            system="You are an experienced travel advisor. Suggest practical improvements to travel plans."
+        ):
+            if chunk.get("type") == "chunk":
+                improvements += chunk.get("content", "")
+        step.output = "Analysis complete"
+
+    await cl.Message(content=f"## Suggested Improvements\n\n{improvements}").send()
+
+
+async def handle_file_upload(message: cl.Message):
+    """Handle uploaded files - extract content and offer to revise travel plans."""
+    from core.utils import extract_text_from_file
+    from services.llm_router import get_llm_router
+
+    supported_types = {
+        'application/pdf': 'PDF',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
+        'text/plain': 'Text'
+    }
+
+    for element in message.elements:
+        # Check if file type is supported
+        file_type = None
+        for mime, name in supported_types.items():
+            if element.mime and mime in element.mime:
+                file_type = name
+                break
+
+        # Also check by extension
+        if not file_type and element.path:
+            ext = element.path.lower().split('.')[-1]
+            ext_map = {'pdf': 'PDF', 'docx': 'Word', 'xlsx': 'Excel', 'txt': 'Text'}
+            file_type = ext_map.get(ext)
+
+        if not file_type:
+            await cl.Message(
+                content=f"Sorry, I can't read **{element.name}**. Supported formats: PDF, Word (.docx), Excel (.xlsx), Text (.txt)"
+            ).send()
+            continue
+
+        # Show processing message
+        await cl.Message(content=f"Reading your {file_type} file: **{element.name}**...").send()
+
+        # Extract text content
+        async with cl.Step(name="Document Reader", type="tool") as step:
+            content = extract_text_from_file(element.path, element.mime)
+            step.output = f"Extracted {len(content)} characters"
+
+        if content.startswith("Error") or content.startswith("Unsupported"):
+            await cl.Message(content=f"Sorry, I couldn't read the file: {content}").send()
+            continue
+
+        # Store the uploaded content for context
+        cl.user_session.set("uploaded_plan", content)
+        cl.user_session.set("uploaded_filename", element.name)
+
+        # Analyze the content with AI
+        async with cl.Step(name="Plan Analyzer", type="tool") as step:
+            router = get_llm_router()
+
+            analysis_prompt = f"""Analyze this uploaded travel document and extract key information:
+
+{content[:8000]}  # Limit to avoid token issues
+
+Identify and summarize:
+1. **Destination(s)**: Where is the trip to?
+2. **Dates**: When is the trip?
+3. **Itinerary**: Key activities/places planned
+4. **Budget**: Any budget info mentioned
+5. **Accommodations**: Hotels/stays mentioned
+6. **What's missing or could be improved?**
+
+Be concise - just extract the key points."""
+
+            analysis = ""
+            for chunk in router.call_expert_stream(
+                prompt=analysis_prompt,
+                system="You are a travel planning assistant. Analyze uploaded travel documents and extract key information concisely."
+            ):
+                if chunk.get("type") == "chunk":
+                    analysis += chunk.get("content", "")
+
+            step.output = "Analysis complete"
+
+        # Show analysis and offer options
+        response = f"""## I've read your travel plan: **{element.name}**
+
+{analysis}
+
+---
+
+**What would you like me to do?**
+- "Update this plan" - I'll refresh with current data (flights, hotels, weather)
+- "Improve this plan" - I'll suggest enhancements
+- "Just use the destination" - Start fresh planning for this destination
+- Or ask me any specific questions about the plan!"""
+
+        await cl.Message(content=response).send()
+
+
 @cl.on_message
 async def on_message(message: cl.Message):
     """Handle user messages."""
@@ -500,7 +666,22 @@ async def on_message(message: cl.Message):
     trip_data = cl.user_session.get("trip_data")
     intake_mode = cl.user_session.get("intake_mode", False)
 
+    # Handle file uploads
+    if message.elements:
+        await handle_file_upload(message)
+        return
+
     user_input = message.content.lower().strip()
+
+    # Check for uploaded plan revision requests
+    uploaded_plan = cl.user_session.get("uploaded_plan")
+    if uploaded_plan:
+        if "update" in user_input and "plan" in user_input:
+            await handle_plan_update(uploaded_plan)
+            return
+        elif "improve" in user_input and "plan" in user_input:
+            await handle_plan_improvement(uploaded_plan)
+            return
 
     # Check for "plan my trip" command - this bypasses intake mode (power user)
     if "plan" in user_input and ("trip" in user_input or "my" in user_input):

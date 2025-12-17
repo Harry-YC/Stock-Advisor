@@ -27,10 +27,11 @@ pandas>=2.0.0                    # Data manipulation
 python-dateutil>=2.8.2           # Date parsing
 
 # =============================================================================
-# Document Export
+# Document Export & Import
 # =============================================================================
-python-docx>=0.8.11              # Word document export
-openpyxl>=3.1.0                  # Excel export
+python-docx>=0.8.11              # Word document export/import
+openpyxl>=3.1.0                  # Excel export/import
+PyPDF2>=3.0.0                    # PDF reading
 
 # =============================================================================
 # Database (Optional - SQLite persistence)

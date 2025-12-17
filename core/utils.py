@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'extract_simple_query',
     'user_friendly_error',
+    'extract_text_from_file',
 ]
 
 
@@ -156,3 +157,105 @@ def extract_simple_query(original_query: str) -> str:
         simple_query = ' '.join(original_query.split()[:5])
 
     return simple_query
+
+
+# =============================================================================
+# DOCUMENT EXTRACTION
+# =============================================================================
+
+def extract_text_from_file(file_path: str, mime_type: str = None) -> str:
+    """
+    Extract text content from uploaded files.
+
+    Supports: PDF, Word (.docx), Excel (.xlsx), Text (.txt)
+
+    Args:
+        file_path: Path to the uploaded file
+        mime_type: Optional MIME type hint
+
+    Returns:
+        Extracted text content
+    """
+    import os
+
+    # Determine file type from extension if mime not provided
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if ext == '.pdf' or (mime_type and 'pdf' in mime_type):
+            return _extract_pdf(file_path)
+        elif ext == '.docx' or (mime_type and 'wordprocessingml' in mime_type):
+            return _extract_docx(file_path)
+        elif ext == '.xlsx' or (mime_type and 'spreadsheetml' in mime_type):
+            return _extract_xlsx(file_path)
+        elif ext == '.txt' or (mime_type and 'text/plain' in mime_type):
+            return _extract_text(file_path)
+        else:
+            logger.warning(f"Unsupported file type: {ext}")
+            return f"Unsupported file type: {ext}"
+    except Exception as e:
+        logger.error(f"Error extracting text from {file_path}: {e}")
+        return f"Error reading file: {str(e)}"
+
+
+def _extract_pdf(file_path: str) -> str:
+    """Extract text from PDF file."""
+    from PyPDF2 import PdfReader
+
+    reader = PdfReader(file_path)
+    text_parts = []
+
+    for i, page in enumerate(reader.pages):
+        page_text = page.extract_text()
+        if page_text:
+            text_parts.append(f"--- Page {i+1} ---\n{page_text}")
+
+    return "\n\n".join(text_parts) if text_parts else "No text found in PDF"
+
+
+def _extract_docx(file_path: str) -> str:
+    """Extract text from Word document."""
+    from docx import Document
+
+    doc = Document(file_path)
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+
+    # Also extract tables
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = " | ".join(cell.text.strip() for cell in row.cells)
+            if row_text.strip():
+                paragraphs.append(row_text)
+
+    return "\n\n".join(paragraphs) if paragraphs else "No text found in document"
+
+
+def _extract_xlsx(file_path: str) -> str:
+    """Extract text from Excel file."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(file_path, data_only=True)
+    text_parts = []
+
+    for sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+        sheet_content = [f"=== Sheet: {sheet_name} ==="]
+
+        for row in sheet.iter_rows():
+            row_values = []
+            for cell in row:
+                if cell.value is not None:
+                    row_values.append(str(cell.value))
+            if row_values:
+                sheet_content.append(" | ".join(row_values))
+
+        if len(sheet_content) > 1:  # More than just header
+            text_parts.append("\n".join(sheet_content))
+
+    return "\n\n".join(text_parts) if text_parts else "No data found in spreadsheet"
+
+
+def _extract_text(file_path: str) -> str:
+    """Extract text from plain text file."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return f.read()
