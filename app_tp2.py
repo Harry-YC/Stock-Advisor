@@ -51,16 +51,24 @@ User message: "{user_message}"
 Return JSON with these fields (use null if not mentioned):
 {{
   "destination": "city/country or null",
-  "dates": "date range string or null",
+  "origin": "departure city/country or null",
+  "departure_date": "departure/start date or null",
+  "return_date": "return/end date or null",
   "duration_days": number or null,
   "travelers": "description or null",
   "budget": number or null
 }}
 
+IMPORTANT: Pay attention to words like "returning on", "back on", "until" - these indicate the RETURN date, not departure.
+If user gives both a duration and a return date, use return date and calculate departure from duration.
+
 Examples:
-- "Barcelona next month with my wife" -> {{"destination": "Barcelona, Spain", "dates": "next month", "travelers": "2 adults (couple)", "budget": null, "duration_days": null}}
-- "around 3000 dollars" -> {{"destination": null, "dates": null, "travelers": null, "budget": 3000, "duration_days": null}}
-- "a week in mid-January" -> {{"destination": null, "dates": "mid-January", "duration_days": 7, "travelers": null, "budget": null}}
+- "Barcelona next month with my wife" -> {{"destination": "Barcelona, Spain", "origin": null, "departure_date": "next month", "return_date": null, "travelers": "2 adults (couple)", "budget": null, "duration_days": null}}
+- "Tokyo from San Francisco" -> {{"destination": "Tokyo, Japan", "origin": "San Francisco", "departure_date": null, "return_date": null, "travelers": null, "budget": null, "duration_days": null}}
+- "3 day trip returning on 1-9-2026" -> {{"destination": null, "origin": null, "departure_date": null, "return_date": "1-9-2026", "travelers": null, "budget": null, "duration_days": 3}}
+- "trip from Jan 6 to Jan 9" -> {{"destination": null, "origin": null, "departure_date": "Jan 6", "return_date": "Jan 9", "travelers": null, "budget": null, "duration_days": null}}
+- "trip to Paris from Taipei budget 5000" -> {{"destination": "Paris, France", "origin": "Taipei", "departure_date": null, "return_date": null, "travelers": null, "budget": 5000, "duration_days": null}}
+- "a week in mid-January" -> {{"destination": null, "origin": null, "departure_date": "mid-January", "return_date": null, "duration_days": 7, "travelers": null, "budget": null}}
 
 Return ONLY the JSON object, nothing else."""
 
@@ -120,9 +128,20 @@ async def handle_intake_message(message: str):
         extracted = []
         if trip_info.get("destination"):
             extracted.append(f"📍 {trip_info['destination']}")
-        if trip_info.get("dates") or trip_info.get("duration_days"):
-            date_info = trip_info.get("dates") or f"{trip_info.get('duration_days')} days"
-            extracted.append(f"📅 {date_info}")
+        if trip_info.get("origin"):
+            extracted.append(f"✈️ from {trip_info['origin']}")
+        # Handle new date fields
+        date_parts = []
+        if trip_info.get("departure_date"):
+            date_parts.append(trip_info['departure_date'])
+        if trip_info.get("return_date"):
+            date_parts.append(f"return {trip_info['return_date']}")
+        if trip_info.get("duration_days"):
+            date_parts.append(f"{trip_info['duration_days']} days")
+        if date_parts:
+            extracted.append(f"📅 {', '.join(date_parts)}")
+        elif trip_info.get("dates"):
+            extracted.append(f"📅 {trip_info['dates']}")
         if trip_info.get("travelers"):
             extracted.append(f"👥 {trip_info['travelers']}")
         if trip_info.get("budget"):
@@ -311,12 +330,44 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
     """Convert intake trip_info to the trip_config format used by handle_plan_trip."""
     from datetime import timedelta
 
-    # Parse dates from natural language
-    dates_str = trip_info.get("dates", "")
+    # Get date fields from extraction
+    departure_str = trip_info.get("departure_date", "") or trip_info.get("dates", "")
+    return_str = trip_info.get("return_date", "")
     duration = trip_info.get("duration_days")
 
-    # Use the flexible date range parser
-    departure, return_date = parse_date_range(dates_str, duration)
+    # Parse dates
+    departure = None
+    return_date = None
+
+    if departure_str:
+        departure = parse_flexible_date(departure_str)
+    if return_str:
+        return_date = parse_flexible_date(return_str)
+
+    # Calculate missing date from duration
+    if return_date and not departure and duration:
+        # User gave return date and duration - calculate departure
+        departure = return_date - timedelta(days=duration - 1)
+    elif departure and not return_date and duration:
+        # User gave departure and duration - calculate return
+        return_date = departure + timedelta(days=duration - 1)
+    elif departure and return_date:
+        # Both dates given - use them directly
+        pass
+    elif departure and not return_date:
+        # Only departure, default to 7 days
+        return_date = departure + timedelta(days=duration or 7)
+    elif return_date and not departure:
+        # Only return date, default to 7 days back
+        departure = return_date - timedelta(days=(duration or 7) - 1)
+    else:
+        # No dates at all - default to 30 days from now
+        departure = date.today() + timedelta(days=30)
+        return_date = departure + timedelta(days=duration or 7)
+
+    # Sanity check: return should be after departure
+    if return_date <= departure:
+        return_date = departure + timedelta(days=duration or 7)
 
     # Map travelers string to select value
     travelers_str = trip_info.get("travelers", "2 adults")
@@ -335,7 +386,7 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
 
     return {
         "destination": trip_info.get("destination", ""),
-        "origin": "",  # Not collected in intake yet
+        "origin": trip_info.get("origin", ""),  # Extracted from "from X" in user input
         "departure": departure.isoformat(),
         "return_date": return_date.isoformat(),
         "travelers": travelers,
