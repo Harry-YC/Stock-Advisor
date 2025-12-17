@@ -856,8 +856,8 @@ async def handle_plan_trip(trip_config: Dict):
 
     # Summary message with export buttons
     export_actions = [
-        cl.Action(name="export_excel", label="Export to Excel", value="excel", payload={"format": "excel"}),
-        cl.Action(name="export_word", label="Export to Word", value="word", payload={"format": "word"}),
+        cl.Action(name="export_excel", label="📊 Export to Excel", value="excel", payload={"format": "excel"}),
+        cl.Action(name="export_word", label="📄 Export to Word", value="word", payload={"format": "word"}),
     ]
     await cl.Message(
         content="---\n\n**Trip planning complete!** Ask me any follow-up questions about your trip, "

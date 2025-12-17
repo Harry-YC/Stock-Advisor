@@ -495,17 +495,22 @@ class ExcelExportService:
         ws_tips = wb.create_sheet("Expert Tips")
         self._create_tips_sheet(ws_tips, plan, header_font, header_fill, thin_border)
 
-        # Sheet 7: Weather Forecast (if available)
+        # Sheet 7: Flight Options (if available - real API data)
+        if trip_data and trip_data.get("flights"):
+            ws_flights = wb.create_sheet("Flights")
+            self._create_flights_sheet(ws_flights, trip_data["flights"], header_font, header_fill, thin_border)
+
+        # Sheet 8: Weather Forecast (if available)
         if trip_data and trip_data.get("weather"):
             ws_weather = wb.create_sheet("Weather")
             self._create_weather_sheet(ws_weather, trip_data["weather"], header_font, header_fill, thin_border)
 
-        # Sheet 8: Dining & Restaurants (if available)
+        # Sheet 9: Dining & Restaurants (if available)
         if trip_data and trip_data.get("dining"):
             ws_dining = wb.create_sheet("Dining")
             self._create_dining_sheet(ws_dining, trip_data["dining"], header_font, header_fill, thin_border)
 
-        # Sheet 9: Raw Recommendation (for reference)
+        # Sheet 10: Raw Recommendation (for reference)
         ws_raw = wb.create_sheet("Full Recommendation")
         self._create_raw_sheet(ws_raw, plan, title_font)
 
@@ -1254,7 +1259,7 @@ class ExcelExportService:
 
     def _create_raw_sheet(self, ws, plan: TravelPlan, title_font):
         """Create the raw recommendation sheet for reference."""
-        from openpyxl.styles import Alignment
+        from openpyxl.styles import Alignment, Font
 
         ws['A1'] = "Full Travel Recommendation"
         ws['A1'].font = title_font
@@ -1551,6 +1556,139 @@ class ExcelExportService:
 
         # Column widths
         widths = [20, 15, 12, 10, 10, 15, 15, 25, 12, 12, 20]
+        for col, width in enumerate(widths, start=1):
+            ws.column_dimensions[chr(64 + col)].width = width
+
+    def _create_flights_sheet(self, ws, flights_data: str, header_font, header_fill, border):
+        """Create the Flights sheet - Real flight options from API data."""
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        # Title
+        ws['A1'] = "FLIGHT OPTIONS"
+        ws['A1'].font = Font(bold=True, size=16, color="2196F3")
+        ws.merge_cells('A1:J1')
+        ws.row_dimensions[1].height = 30
+
+        # Instructions
+        ws['A2'] = "Real-time flight options from Amadeus API. Compare options and book your preferred flight."
+        ws['A2'].font = Font(italic=True, size=10, color="666666")
+        ws.merge_cells('A2:J2')
+
+        # Flight Comparison Section
+        ws['A4'] = "AVAILABLE FLIGHT OPTIONS"
+        ws['A4'].font = Font(bold=True, size=11, color="FFFFFF")
+        ws['A4'].fill = PatternFill(start_color="2196F3", end_color="2196F3", fill_type="solid")
+        ws.merge_cells('A4:J4')
+
+        row = 5
+        if flights_data:
+            # Parse the formatted flight data
+            lines = flights_data.split('\n')
+            current_option = 0
+
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Check for option headers (e.g., "**Option 1**" or "### Option 1")
+                if 'option' in line.lower() and ('**' in line or '###' in line or line.startswith('#')):
+                    current_option += 1
+                    ws.cell(row=row, column=1, value=f"Option {current_option}")
+                    ws.cell(row=row, column=1).font = Font(bold=True, size=12)
+                    ws.cell(row=row, column=1).fill = PatternFill(start_color="E3F2FD", end_color="E3F2FD", fill_type="solid")
+                    ws.merge_cells(f'A{row}:J{row}')
+                    row += 1
+                    continue
+
+                # Skip markdown table separators
+                if '---' in line or line == '|':
+                    continue
+
+                # Parse table rows
+                if '|' in line:
+                    parts = [p.strip() for p in line.split('|') if p.strip()]
+                    if parts:
+                        for col, part in enumerate(parts[:10], start=1):
+                            cell = ws.cell(row=row, column=col, value=part[:50])
+                            cell.border = border
+                            cell.alignment = Alignment(wrap_text=True)
+                        row += 1
+                        continue
+
+                # Regular text lines (flight details)
+                if line.startswith('-') or line.startswith('*'):
+                    ws.cell(row=row, column=1, value=line[1:].strip()[:100])
+                    ws.merge_cells(f'A{row}:J{row}')
+                    row += 1
+                elif '$' in line or 'price' in line.lower() or 'total' in line.lower():
+                    # Price lines - highlight
+                    ws.cell(row=row, column=1, value=line[:100])
+                    ws.cell(row=row, column=1).font = Font(bold=True, color="4CAF50")
+                    ws.merge_cells(f'A{row}:J{row}')
+                    row += 1
+                elif line:
+                    ws.cell(row=row, column=1, value=line[:100])
+                    ws.merge_cells(f'A{row}:J{row}')
+                    row += 1
+        else:
+            ws.cell(row=row, column=1, value="No flight data available. Flight information will appear here when fetched.")
+            ws.merge_cells(f'A{row}:J{row}')
+            row += 1
+
+        # Booking Tracker Section
+        row += 2
+        ws.cell(row=row, column=1, value="FLIGHT BOOKING TRACKER")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=11, color="FFFFFF")
+        ws.cell(row=row, column=1).fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
+        ws.merge_cells(f'A{row}:J{row}')
+
+        row += 1
+        booking_headers = [
+            "Flight Type", "Airline", "Flight #", "Route", "Date",
+            "Departure", "Arrival", "Seat", "PNR/Confirmation", "Status"
+        ]
+
+        for col, header in enumerate(booking_headers, start=1):
+            cell = ws.cell(row=row, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+
+        row += 1
+        # Template rows for outbound and return
+        for flight_type in ["Outbound", "Return"]:
+            ws.cell(row=row, column=1, value=flight_type).border = border
+            for col in range(2, 11):
+                ws.cell(row=row, column=col).border = border
+            ws.cell(row=row, column=10, value="Not Booked").border = border
+            row += 1
+
+        # Booking Tips Section
+        row += 2
+        ws.cell(row=row, column=1, value="BOOKING TIPS")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=11, color="FFFFFF")
+        ws.cell(row=row, column=1).fill = PatternFill(start_color="FF9800", end_color="FF9800", fill_type="solid")
+        ws.merge_cells(f'A{row}:J{row}')
+
+        tips = [
+            "• Compare prices on multiple booking sites (Google Flights, Skyscanner, Kayak)",
+            "• Book directly with airline for easier changes/refunds",
+            "• Check baggage allowance before booking",
+            "• Consider flexible fare if plans might change",
+            "• Set price alerts if you can wait to book",
+            "• Join airline loyalty program before booking",
+        ]
+
+        row += 1
+        for tip in tips:
+            ws.cell(row=row, column=1, value=tip)
+            ws.merge_cells(f'A{row}:J{row}')
+            row += 1
+
+        # Column widths
+        widths = [15, 12, 12, 20, 12, 10, 10, 8, 18, 12]
         for col, width in enumerate(widths, start=1):
             ws.column_dimensions[chr(64 + col)].width = width
 

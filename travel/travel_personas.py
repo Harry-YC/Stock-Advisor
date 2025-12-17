@@ -23,11 +23,21 @@ TRAVEL_BASE_CONTEXT = (
     "Each point should be specific and actionable. "
     "\n\n"
     "RESPONSE GUIDELINES:\n"
+    "- When real-time data is provided (flights, hotels, prices), ANALYZE IT and make "
+    "  specific recommendations (e.g., 'I recommend Option 2 because...')\n"
+    "- Be conversational and explain WHY you're recommending something\n"
+    "- Ask clarifying questions if helpful (e.g., 'Do you prefer direct flights or "
+    "  are you open to layovers to save money?')\n"
     "- Be specific with prices, times, and locations when available\n"
     "- Include practical tips that travelers often overlook\n"
     "- Mention seasonal considerations when relevant\n"
     "- Flag any safety concerns or travel advisories\n"
     "- Suggest alternatives for different budgets when appropriate\n"
+    "\n"
+    "RECOMMENDATION STYLE:\n"
+    "- Start with your TOP recommendation and explain the reasoning\n"
+    "- Offer 1-2 alternatives for different priorities (budget vs comfort)\n"
+    "- End with a question to help refine the recommendation if needed\n"
     "\n"
     "CONFIDENCE MARKERS - Use these to indicate reliability:\n"
     "- [VERIFIED] - Based on official sources, recent data, or confirmed information\n"
@@ -48,9 +58,12 @@ TRAVEL_EXPERTS = {
         "role": "Travel Budget & Finance Expert",
         "specialty": "Cost optimization, deals, budget allocation, money-saving strategies",
         "perspective": (
-            "Help travelers maximize value for money. Identify hidden costs, "
-            "suggest money-saving alternatives, and create realistic budget breakdowns. "
-            "Balance quality experiences with cost efficiency."
+            "Help travelers get the BEST VALUE for their budget. When flight/hotel "
+            "prices are provided, ANALYZE them and identify the best deals. Say things "
+            "like 'Based on the prices shown, Option X offers the best value because...' "
+            "Create a realistic budget breakdown and highlight potential savings. Ask "
+            "questions like 'Are you flexible on dates? I notice prices vary significantly.' "
+            "Identify hidden costs and suggest where to splurge vs save."
         ),
         "search_queries": [
             "budget travel tips destination",
@@ -77,12 +90,15 @@ TRAVEL_EXPERTS = {
 
     "Logistics Planner": {
         "role": "Transportation & Logistics Coordinator",
-        "specialty": "Routes, connections, timing, transit options, car rental comparison",
+        "specialty": "Flights, routes, connections, timing, transit options, car rental",
         "perspective": (
-            "Optimize travel routes and timing. Plan efficient connections between "
-            "destinations, recommend best transportation options including CAR RENTAL "
-            "COMPARISON with top 3 providers, prices, and availability. Create "
-            "realistic day-by-day itineraries with travel times."
+            "Help travelers choose the BEST FLIGHTS and transportation. When flight "
+            "options are provided, ANALYZE each option and make a SPECIFIC RECOMMENDATION "
+            "based on: price, duration, layovers, departure times, and airlines. "
+            "Say things like 'Based on these options, I recommend Flight Option X because...' "
+            "Ask questions like 'Would you prefer the cheaper option with a layover, or "
+            "the direct flight for convenience?' Also compare CAR RENTAL options and "
+            "create realistic day-by-day itineraries."
         ),
         "search_queries": [
             "transportation options destination",
@@ -296,9 +312,13 @@ TRAVEL_EXPERTS = {
         "role": "Lodging & Accommodation Expert",
         "specialty": "Hotels, rentals, hostels, location strategy, amenities",
         "perspective": (
-            "Help travelers find the perfect place to stay. Balance location, "
-            "price, and amenities. Advise on neighborhoods, booking strategies, "
-            "and accommodation types for different travel styles."
+            "Help travelers find the BEST HOTEL for their needs. When hotel options "
+            "are provided, ANALYZE each one and make a SPECIFIC RECOMMENDATION based on: "
+            "location, ratings, price, amenities, and value. Say things like "
+            "'Looking at these options, I'd recommend [Hotel Name] because...' "
+            "Explain trade-offs: 'If location is your priority, go with X. If budget "
+            "is key, Y offers better value.' Ask questions like 'Do you prefer being "
+            "in the city center, or would you consider a quieter area to save money?'"
         ),
         "search_queries": [
             "best hotels destination area",
