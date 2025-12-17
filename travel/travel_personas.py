@@ -61,6 +61,7 @@ TRAVEL_EXPERTS = {
     # ========================================================================
 
     "Booking Specialist": {
+        "model": "gemini-3-pro-preview",  # Pro for flight/hotel price accuracy
         "role": "Flight & Hotel Booking Expert",
         "specialty": "Real-time flight search, hotel comparisons, booking recommendations",
         "perspective": (
@@ -110,6 +111,7 @@ TRAVEL_EXPERTS = {
     },
 
     "Budget Advisor": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Travel Budget Strategist",
         "specialty": "Overall budget planning, cost allocation, savings strategies, hidden costs",
         "perspective": (
@@ -157,6 +159,7 @@ TRAVEL_EXPERTS = {
     },
 
     "Logistics Planner": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Ground Transportation & Itinerary Coordinator",
         "specialty": "Routes, ground transport, car rentals, day-by-day planning, connections",
         "perspective": (
@@ -207,6 +210,7 @@ TRAVEL_EXPERTS = {
     # ========================================================================
 
     "Safety Expert": {
+        "model": "gemini-3-pro-preview",  # Pro for visa/advisory accuracy
         "role": "Travel Safety & Insurance Specialist",
         "specialty": "Travel advisories, medical insurance recommendations, emergency prep",
         "perspective": (
@@ -241,6 +245,7 @@ TRAVEL_EXPERTS = {
     },
 
     "Weather Analyst": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Climate & Packing Expert",
         "specialty": "Weather forecasts, climate patterns, packing lists, what to wear",
         "perspective": (
@@ -289,6 +294,7 @@ TRAVEL_EXPERTS = {
     # ========================================================================
 
     "Local Culture Guide": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Cultural Expert & Etiquette Advisor",
         "specialty": "Local customs, etiquette, language, cultural dos/don'ts, respectful travel",
         "perspective": (
@@ -333,6 +339,7 @@ TRAVEL_EXPERTS = {
     },
 
     "Food & Dining Expert": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Culinary & Restaurant Specialist",
         "specialty": "What to eat, where to eat, restaurants, dietary needs, food experiences",
         "perspective": (
@@ -381,6 +388,7 @@ TRAVEL_EXPERTS = {
     },
 
     "Activity Curator": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Attractions & Things-To-Do Specialist",
         "specialty": "What to see, tours, attractions, day trips, entertainment, outdoor activities",
         "perspective": (
@@ -433,6 +441,7 @@ TRAVEL_EXPERTS = {
     # ========================================================================
 
     "Accommodation Specialist": {
+        "model": "gemini-3-flash-preview",  # Flash for speed
         "role": "Neighborhood & Lodging Strategy Expert",
         "specialty": "Best areas to stay, accommodation types, location trade-offs",
         "perspective": (
@@ -634,12 +643,12 @@ def call_travel_expert(
             'tokens': {}
         }
 
-    # Get model from settings if not specified
-    if not model:
-        model = getattr(settings, 'EXPERT_MODEL', 'gemini-2.0-flash')
-
     # Get expert config
     expert_info = TRAVEL_EXPERTS.get(persona_name, {})
+
+    # Get model: prefer expert-specific, then parameter, then settings
+    if not model:
+        model = expert_info.get("model") or getattr(settings, 'EXPERT_MODEL', 'gemini-3-pro-preview')
     if not expert_info:
         return {
             'content': f"Error: Unknown travel expert '{persona_name}'",
@@ -757,9 +766,12 @@ def call_travel_expert_stream(
         yield {'type': 'complete', 'finish_reason': 'error', 'model': model or 'unknown'}
         return
 
-    # Get model from settings if not specified
+    # Get expert config for model selection
+    expert_info = TRAVEL_EXPERTS.get(persona_name, {})
+
+    # Get model: prefer expert-specific, then parameter, then settings
     if not model:
-        model = getattr(settings, 'EXPERT_MODEL', 'gemini-2.0-flash')
+        model = expert_info.get("model") or getattr(settings, 'EXPERT_MODEL', 'gemini-3-pro-preview')
 
     # Get max tokens from settings if not specified
     if max_completion_tokens is None:

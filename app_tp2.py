@@ -43,6 +43,7 @@ async def extract_trip_info(user_message: str, existing_info: dict) -> dict:
     router = get_llm_router()
 
     prompt = f"""Extract trip details from this user message. Return ONLY valid JSON, no markdown.
+The user may write in English, Traditional Chinese (繁體中文), or a mix of both.
 
 Current known info: {json.dumps(existing_info)}
 
@@ -52,19 +53,26 @@ Return JSON with these fields (use null if not mentioned):
 {{
   "destination": "city/country or null",
   "origin": "departure city/country or null",
-  "departure_date": "departure/start date or null",
+  "departure_date": "departure/start date or null (convert Chinese dates like 一月六號 to Jan 6)",
   "return_date": "return/end date or null",
   "duration_days": number or null,
   "travelers": "description or null",
-  "budget": number or null,
+  "budget": number or null (convert Chinese numerals to digits: 一萬二 = 12000, 五萬 = 50000),
+  "budget_currency": "3-letter ISO code or null. Map these terms:
+    台幣/新台幣=TWD, 美金/美元=USD, 日幣/日圓/日元=JPY, 歐元=EUR, 英鎊=GBP,
+    人民幣/人民币=CNY, 韓幣/韓元/韩币=KRW, 港幣/港元=HKD, 新幣/新加坡幣=SGD,
+    澳幣/澳元=AUD, 加幣/加元=CAD, 瑞士法郎/瑞郎=CHF, 泰銖/泰铢=THB,
+    馬幣/令吉=MYR, 披索/菲律賓披索=PHP, 印尼盾=IDR, 越南盾=VND,
+    印度盧比/盧比=INR, 紐幣/紐元=NZD, 墨西哥披索=MXN, 巴西雷亞爾=BRL,
+    南非蘭特=ZAR, 瑞典克朗=SEK, 挪威克朗=NOK, 丹麥克朗=DKK",
   "travel_style": "foodie/adventure/relaxation/cultural/budget/luxury or null",
   "special_interests": "specific interests mentioned or null"
 }}
 
-IMPORTANT: Pay attention to words like "returning on", "back on", "until" - these indicate the RETURN date, not departure.
+IMPORTANT: Pay attention to words like "returning on", "back on", "until", "回程", "返回" - these indicate the RETURN date, not departure.
 If user gives both a duration and a return date, use return date and calculate departure from duration.
 
-Examples:
+English Examples:
 - "Barcelona next month with my wife" -> {{"destination": "Barcelona, Spain", "origin": null, "departure_date": "next month", "return_date": null, "travelers": "2 adults (couple)", "budget": null, "duration_days": null}}
 - "Tokyo from San Francisco" -> {{"destination": "Tokyo, Japan", "origin": "San Francisco", "departure_date": null, "return_date": null, "travelers": null, "budget": null, "duration_days": null}}
 - "3 day trip returning on 1-9-2026" -> {{"destination": null, "origin": null, "departure_date": null, "return_date": "1-9-2026", "travelers": null, "budget": null, "duration_days": 3}}
@@ -73,6 +81,27 @@ Examples:
 - "a week in mid-January" -> {{"destination": null, "origin": null, "departure_date": "mid-January", "return_date": null, "duration_days": 7, "travelers": null, "budget": null}}
 - "myself" or "just me" or "solo" -> {{"travelers": "1 adult (solo)"}}
 - "foodie trip" -> extract "foodie" as a travel style hint, not travelers
+
+Traditional Chinese Examples (繁體中文):
+- "我想去東京" -> {{"destination": "Tokyo, Japan", "origin": null, ...}}
+- "從台北出發去巴黎" -> {{"destination": "Paris, France", "origin": "Taipei", ...}}
+- "2026年1月6日出發" or "一月六號出發" -> {{"departure_date": "Jan 6, 2026", ...}}
+- "一月六號到一月九號" -> {{"departure_date": "Jan 6", "return_date": "Jan 9", ...}}
+- "三天兩夜" -> {{"duration_days": 3, ...}}
+- "五天四夜" -> {{"duration_days": 5, ...}}
+- "一週" or "一個禮拜" -> {{"duration_days": 7, ...}}
+- "我自己" or "一個人" or "獨自旅行" -> {{"travelers": "1 adult (solo)"}}
+- "跟老婆" or "和太太" or "夫妻倆" -> {{"travelers": "2 adults (couple)"}}
+- "全家" or "帶小孩" -> {{"travelers": "2 adults + children (family)"}}
+- "預算五萬" or "預算50000" -> {{"budget": 50000, ...}}
+- "預算一萬二台幣" -> {{"budget": 12000, "budget_currency": "TWD", ...}}
+- "一萬二新台幣" -> {{"budget": 12000, "budget_currency": "TWD", ...}}
+- "三千美金" or "3000美元" -> {{"budget": 3000, "budget_currency": "USD", ...}}
+- "十萬日幣" or "十萬日圓" -> {{"budget": 100000, "budget_currency": "JPY", ...}}
+- "兩萬五" -> {{"budget": 25000, ...}} (二萬五千 = 25000)
+- "美食之旅" -> {{"travel_style": "foodie", ...}}
+- "下個月" -> {{"departure_date": "next month", ...}}
+- "明年一月" -> {{"departure_date": "January next year", ...}}
 
 Return ONLY the JSON object, nothing else."""
 
@@ -149,7 +178,19 @@ async def handle_intake_message(message: str):
         if trip_info.get("travelers"):
             extracted.append(f"👥 {trip_info['travelers']}")
         if trip_info.get("budget"):
-            extracted.append(f"💰 ${trip_info['budget']:,}")
+            # Show currency if specified (25 common currencies)
+            currency = trip_info.get("budget_currency", "")
+            currency_symbols = {
+                "USD": "$", "TWD": "NT$", "NTD": "NT$", "JPY": "¥", "EUR": "€",
+                "GBP": "£", "CNY": "¥", "RMB": "¥", "KRW": "₩", "HKD": "HK$",
+                "SGD": "S$", "AUD": "A$", "CAD": "C$", "CHF": "CHF ", "THB": "฿",
+                "MYR": "RM ", "PHP": "₱", "IDR": "Rp ", "VND": "₫", "INR": "₹",
+                "NZD": "NZ$", "MXN": "MX$", "BRL": "R$", "ZAR": "R ",
+                "SEK": "kr ", "NOK": "kr ", "DKK": "kr "
+            }
+            symbol = currency_symbols.get(currency, "$")
+            currency_suffix = f" {currency}" if currency and currency != "USD" else ""
+            extracted.append(f"💰 {symbol}{trip_info['budget']:,}{currency_suffix}")
 
         step.output = " | ".join(extracted) if extracted else "Processing..."
 
@@ -174,6 +215,18 @@ async def show_trip_confirmation(trip_info: dict):
     origin = trip_info.get("origin", "")
     travelers = trip_config.get("travelers", "2 adults")
     budget = trip_config.get("budget", 5000)
+    budget_currency = trip_config.get("budget_currency", "USD")
+
+    # Currency symbols (25 common currencies)
+    currency_symbols = {
+        "USD": "$", "TWD": "NT$", "NTD": "NT$", "JPY": "¥", "EUR": "€",
+        "GBP": "£", "CNY": "¥", "RMB": "¥", "KRW": "₩", "HKD": "HK$",
+        "SGD": "S$", "AUD": "A$", "CAD": "C$", "CHF": "CHF ", "THB": "฿",
+        "MYR": "RM ", "PHP": "₱", "IDR": "Rp ", "VND": "₫", "INR": "₹",
+        "NZD": "NZ$", "MXN": "MX$", "BRL": "R$", "ZAR": "R ",
+        "SEK": "kr ", "NOK": "kr ", "DKK": "kr "
+    }
+    currency_symbol = currency_symbols.get(budget_currency, budget_currency + " ")
 
     # Parse dates for display
     try:
@@ -195,7 +248,7 @@ async def show_trip_confirmation(trip_info: dict):
 | **Origin** | {origin or 'Not specified'} |
 | **Dates** | {date_str} |
 | **Travelers** | {travelers} |
-| **Budget** | ${budget:,} |
+| **Budget** | {currency_symbol}{budget:,} {budget_currency} |
 | **Trip Style** | {travel_style or 'Not specified'} |
 
 **Does this look right?**
@@ -252,6 +305,7 @@ def parse_flexible_date(date_str: str, default_year: int = None) -> date:
     - Month names: Jan 6 2026, 6 Jan 2026, January 6, 2026, 6Jan2026
     - Compact: 20260106
     - Relative: next week, in 2 weeks, next month
+    - Chinese: 2026年1月6日, 一月六號, 一月六日
     """
     import re
     from datetime import timedelta
@@ -264,7 +318,82 @@ def parse_flexible_date(date_str: str, default_year: int = None) -> date:
     today = date.today()
     default_year = default_year or today.year
 
-    # Handle relative dates first
+    # Chinese number mapping
+    chinese_nums = {
+        '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
+        '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+        '十': 10, '兩': 2, '两': 2
+    }
+
+    def chinese_to_number(chinese_str: str) -> int:
+        """Convert Chinese numerals to integer (handles 1-31)."""
+        if not chinese_str:
+            return None
+        # Try direct digit
+        if chinese_str.isdigit():
+            return int(chinese_str)
+        # Single character
+        if len(chinese_str) == 1 and chinese_str in chinese_nums:
+            return chinese_nums[chinese_str]
+        # Handle tens: 十, 十一, 二十, 二十一
+        if '十' in chinese_str:
+            parts = chinese_str.split('十')
+            tens = chinese_nums.get(parts[0], 1) if parts[0] else 1
+            ones = chinese_nums.get(parts[1], 0) if len(parts) > 1 and parts[1] else 0
+            return tens * 10 + ones
+        return None
+
+    # Chinese month mapping
+    chinese_months = {
+        '一月': 1, '二月': 2, '三月': 3, '四月': 4,
+        '五月': 5, '六月': 6, '七月': 7, '八月': 8,
+        '九月': 9, '十月': 10, '十一月': 11, '十二月': 12
+    }
+
+    # Handle Chinese date formats: 2026年1月6日 or 1月6日 or 一月六號/日
+    # Pattern: year年month月day日/號
+    chinese_full = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})[日號]', date_str)
+    if chinese_full:
+        year, month, day = int(chinese_full.group(1)), int(chinese_full.group(2)), int(chinese_full.group(3))
+        return date(year, month, day)
+
+    # Pattern without year: 1月6日 or 1月6號
+    chinese_no_year = re.search(r'(\d{1,2})月(\d{1,2})[日號]', date_str)
+    if chinese_no_year:
+        month, day = int(chinese_no_year.group(1)), int(chinese_no_year.group(2))
+        result = date(default_year, month, day)
+        if result < today:
+            result = date(default_year + 1, month, day)
+        return result
+
+    # Pattern with Chinese numerals: 一月六號 or 一月六日
+    for month_cn, month_num in chinese_months.items():
+        if month_cn in date_str:
+            # Find the day part after the month
+            idx = date_str.find(month_cn) + len(month_cn)
+            day_part = date_str[idx:].split('日')[0].split('號')[0]
+            day = chinese_to_number(day_part)
+            if day:
+                # Check for year
+                year_match = re.search(r'(\d{4})年', date_str)
+                year = int(year_match.group(1)) if year_match else default_year
+                result = date(year, month_num, day)
+                if result < today and not year_match:
+                    result = date(year + 1, month_num, day)
+                return result
+
+    # Handle Chinese relative dates
+    if '下個月' in date_str or '下个月' in date_str:
+        return date(today.year + (1 if today.month == 12 else 0),
+                   (today.month % 12) + 1, min(today.day, 28))
+    if '明天' in date_str:
+        return today + timedelta(days=1)
+    if '後天' in date_str or '后天' in date_str:
+        return today + timedelta(days=2)
+    if '下週' in date_str or '下周' in date_str or '下禮拜' in date_str:
+        return today + timedelta(days=7)
+
+    # Handle relative dates first (English)
     date_lower = date_str.lower()
     if 'next week' in date_lower:
         return today + timedelta(days=7)
@@ -451,23 +580,39 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
     travelers_str = trip_info.get("travelers", "2 adults")
     travelers_lower = travelers_str.lower() if travelers_str else ""
 
-    # Solo traveler indicators
-    solo_indicators = ["1", "solo", "alone", "myself", "just me", "by myself", "single", "one person", "one adult"]
-    if any(ind in travelers_lower for ind in solo_indicators):
+    # Solo traveler indicators (English + Chinese)
+    solo_indicators = [
+        "1", "solo", "alone", "myself", "just me", "by myself", "single", "one person", "one adult",
+        "我自己", "一個人", "一个人", "獨自", "独自", "單獨", "单独"
+    ]
+    if any(ind in travelers_str for ind in solo_indicators):
         travelers = "1 adult"
-    elif "child" in travelers_lower or "kid" in travelers_lower or "family" in travelers_lower:
-        if "2" in travelers_lower:
+    # Family with children indicators (English + Chinese)
+    elif any(ind in travelers_str for ind in ["child", "kid", "family", "小孩", "孩子", "全家", "兒童", "儿童", "帶小孩", "带小孩"]):
+        if "2" in travelers_lower or "兩" in travelers_str or "两" in travelers_str:
             travelers = "2 adults + 2 children"
         else:
             travelers = "2 adults + 1 child"
-    elif "group" in travelers_lower or "4" in travelers_lower or "5" in travelers_lower:
+    # Group indicators (English + Chinese)
+    elif any(ind in travelers_str for ind in ["group", "4", "5", "四", "五", "團", "团", "一群"]):
         travelers = "Group (4+)"
-    elif "couple" in travelers_lower or "wife" in travelers_lower or "husband" in travelers_lower or "partner" in travelers_lower:
+    # Couple indicators (English + Chinese)
+    elif any(ind in travelers_str for ind in ["couple", "wife", "husband", "partner", "老婆", "老公", "太太", "先生", "夫妻", "伴侶", "伴侣", "兩個人", "两个人"]):
         travelers = "2 adults"
-    elif "3" in travelers_lower or "three" in travelers_lower:
+    elif "3" in travelers_lower or "three" in travelers_lower or "三" in travelers_str:
         travelers = "Group (4+)"  # Closest match for 3 people
     else:
         travelers = "2 adults"
+
+    # Handle budget and currency
+    budget = trip_info.get("budget", 5000)
+    budget_currency = trip_info.get("budget_currency", "USD")
+
+    # If no currency specified and budget > 10000, likely TWD (common for Taiwan users)
+    if not trip_info.get("budget_currency") and budget and budget > 10000:
+        # Heuristic: budgets over 10000 without currency specified might be TWD
+        # But we'll default to USD and let the user correct if needed
+        budget_currency = "USD"
 
     return {
         "destination": trip_info.get("destination", ""),
@@ -475,7 +620,8 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
         "departure": departure.isoformat(),
         "return_date": return_date.isoformat(),
         "travelers": travelers,
-        "budget": trip_info.get("budget", 5000),
+        "budget": budget,
+        "budget_currency": budget_currency,
         "preset": "Quick Trip Planning",
         "travel_style": trip_info.get("travel_style", ""),
         "special_interests": trip_info.get("special_interests", ""),

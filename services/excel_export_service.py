@@ -120,13 +120,54 @@ class TravelPlanParser:
 
     def __init__(self):
         # Patterns for extracting structured data
-        self.day_pattern = re.compile(r"day\s*(\d+)[:\s-]+(.+?)(?=day\s*\d+|$)", re.IGNORECASE | re.DOTALL)
-        self.time_pattern = re.compile(r"(\d{1,2}:\d{2}\s*(?:am|pm)?|\d{1,2}\s*(?:am|pm))", re.IGNORECASE)
-        self.price_pattern = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)|(\d+(?:,\d{3})*)\s*(?:USD|EUR|GBP|JPY)")
-        self.hotel_pattern = re.compile(r"(?:hotel|stay|accommodation|lodge|hostel|airbnb)[:\s]+([^\n]+)", re.IGNORECASE)
-        self.flight_pattern = re.compile(r"(?:flight|fly|airline)[:\s]+([^\n]+)", re.IGNORECASE)
-        self.duration_pattern = re.compile(r"(\d+)\s*(?:day|night|week)s?", re.IGNORECASE)
-        self.budget_pattern = re.compile(r"(?:budget|cost|price|total)[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)", re.IGNORECASE)
+        # Day pattern: matches "Day 1:", "Day 1 -", "Day 1)", "第一天", etc.
+        self.day_pattern = re.compile(
+            r"(?:day\s*(\d+)|第([一二三四五六七八九十]+)天)[:\s\-\)]+(.+?)(?=(?:day\s*\d+|第[一二三四五六七八九十]+天)|$)",
+            re.IGNORECASE | re.DOTALL
+        )
+        # Time pattern: 9:00, 9:00 AM, 9AM, 09:00
+        self.time_pattern = re.compile(
+            r"(\d{1,2}:\d{2}\s*(?:am|pm)?|\d{1,2}\s*(?:am|pm))",
+            re.IGNORECASE
+        )
+        # Price pattern: $100, $1,000, $100.00, 100 USD, ¥3000, NT$1000, €50
+        self.price_pattern = re.compile(
+            r"(?:\$|USD|US\$)\s*([\d,]+(?:\.\d{2})?)|"  # USD
+            r"(?:¥|JPY|日[幣圓元])\s*([\d,]+)|"  # JPY
+            r"(?:€|EUR)\s*([\d,]+(?:\.\d{2})?)|"  # EUR
+            r"(?:£|GBP)\s*([\d,]+(?:\.\d{2})?)|"  # GBP
+            r"(?:NT\$|TWD|台[幣])\s*([\d,]+)|"  # TWD
+            r"(\d+(?:,\d{3})*)\s*(?:USD|EUR|GBP|JPY|TWD)",  # Number followed by currency
+            re.IGNORECASE
+        )
+        # Hotel pattern: more flexible matching
+        self.hotel_pattern = re.compile(
+            r"(?:hotel|stay(?:ing)?|accommodation|lodge|hostel|airbnb|住宿|飯店|旅館)[:\s]*([^\n]{5,100})",
+            re.IGNORECASE
+        )
+        # Flight pattern: more flexible matching
+        self.flight_pattern = re.compile(
+            r"(?:flight|fly(?:ing)?|airline|班機|航班)[:\s]*([^\n]{5,100})",
+            re.IGNORECASE
+        )
+        # Duration pattern: "7 days", "5 nights", "a week", "三天", "五天四夜"
+        self.duration_pattern = re.compile(
+            r"(\d+)\s*(?:day|night|week)s?|"  # English
+            r"([一二三四五六七八九十]+)[天晚]",  # Chinese
+            re.IGNORECASE
+        )
+        # Budget pattern: more flexible - matches "budget of $3000", "budget: $3000", "$3000 budget"
+        self.budget_pattern = re.compile(
+            r"(?:budget|cost|price|total|預算)[:\s]*(?:of\s*)?\$?\s*([\d,]+(?:\.\d{2})?)|"  # "budget of $3000"
+            r"\$\s*([\d,]+(?:\.\d{2})?)\s*(?:budget|total)|"  # "$3000 budget"
+            r"(?:budget|預算)[:\s]*(?:is\s*)?\$?\s*([\d,]+(?:\.\d{2})?)",  # "budget is $3000"
+            re.IGNORECASE
+        )
+        # Chinese number mapping for duration parsing
+        self._chinese_nums = {
+            '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+            '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+        }
 
     def parse_expert_responses(
         self,
@@ -174,38 +215,75 @@ class TravelPlanParser:
         """Extract trip overview from question and recommendation."""
         overview = TripOverview()
 
-        combined_text = f"{question} {recommendation}".lower()
+        combined_text = f"{question} {recommendation}"
+        combined_lower = combined_text.lower()
 
-        # Extract destination (look for common patterns)
+        # Extract destination (look for common patterns - English and Chinese)
         dest_patterns = [
-            r"trip to\s+([A-Za-z\s,]+?)(?:\s+in|\s+for|\s+with|\?|$)",
+            r"trip to\s+([A-Za-z\s,]+?)(?:\s+in|\s+for|\s+with|\s+budget|\?|$)",
             r"visiting\s+([A-Za-z\s,]+?)(?:\s+in|\s+for|\s+with|\?|$)",
             r"travel to\s+([A-Za-z\s,]+?)(?:\s+in|\s+for|\s+with|\?|$)",
+            r"去\s*([^\s,，]+?)(?:旅[行遊游]|玩|\s|,|，|$)",  # Chinese: 去東京
+            r"到\s*([^\s,，]+?)(?:旅[行遊游]|玩|\s|,|，|$)",  # Chinese: 到巴黎
         ]
         for pattern in dest_patterns:
             match = re.search(pattern, question, re.IGNORECASE)
             if match:
-                overview.destination = match.group(1).strip().title()
+                dest = match.group(1).strip()
+                # Title case for English, keep as-is for Chinese
+                if dest.isascii():
+                    dest = dest.title()
+                overview.destination = dest
                 break
 
-        # Extract duration
-        duration_match = self.duration_pattern.search(combined_text)
+        # Extract duration - handle multiple capture groups
+        duration_match = self.duration_pattern.search(combined_lower)
         if duration_match:
-            overview.duration_days = int(duration_match.group(1))
+            # Check which group matched
+            if duration_match.group(1):  # English number
+                overview.duration_days = int(duration_match.group(1))
+            elif duration_match.group(2):  # Chinese number
+                chinese_num = duration_match.group(2)
+                # Convert Chinese to number
+                if len(chinese_num) == 1:
+                    overview.duration_days = self._chinese_nums.get(chinese_num, 0)
+                elif '十' in chinese_num:
+                    # Handle 十, 十一, 二十, etc.
+                    parts = chinese_num.split('十')
+                    tens = self._chinese_nums.get(parts[0], 1) if parts[0] else 1
+                    ones = self._chinese_nums.get(parts[1], 0) if len(parts) > 1 and parts[1] else 0
+                    overview.duration_days = tens * 10 + ones
 
-        # Extract budget
+        # Extract budget - handle multiple capture groups from flexible pattern
         budget_match = self.budget_pattern.search(combined_text)
         if budget_match:
-            budget_str = budget_match.group(1).replace(",", "")
-            try:
-                overview.total_budget = float(budget_str)
-            except ValueError:
-                pass
+            # Find the first non-None group
+            budget_str = None
+            for group in budget_match.groups():
+                if group:
+                    budget_str = group.replace(",", "")
+                    break
+            if budget_str:
+                try:
+                    overview.total_budget = float(budget_str)
+                except ValueError:
+                    pass
 
-        # Extract travelers
-        travelers_match = re.search(r"(\d+)\s*(?:people|person|travelers|adults)", combined_text)
-        if travelers_match:
-            overview.travelers = int(travelers_match.group(1))
+        # Extract travelers - English and Chinese
+        travelers_patterns = [
+            r"(\d+)\s*(?:people|person|travelers|adults|人)",
+            r"([一二三四五六七八九十]+)\s*(?:人|個人|位)",
+        ]
+        for pattern in travelers_patterns:
+            travelers_match = re.search(pattern, combined_text, re.IGNORECASE)
+            if travelers_match:
+                num_str = travelers_match.group(1)
+                if num_str.isdigit():
+                    overview.travelers = int(num_str)
+                else:
+                    # Chinese number
+                    overview.travelers = self._chinese_nums.get(num_str, 1)
+                break
 
         return overview
 
@@ -216,10 +294,28 @@ class TravelPlanParser:
         # Find day-by-day sections
         day_matches = self.day_pattern.findall(recommendation)
 
-        for day_num, content in day_matches:
-            try:
-                day = int(day_num)
-            except ValueError:
+        for match in day_matches:
+            # match is a tuple: (english_num, chinese_num, content)
+            english_num, chinese_num, content = match
+
+            # Determine day number
+            day = 0
+            if english_num:
+                try:
+                    day = int(english_num)
+                except ValueError:
+                    continue
+            elif chinese_num:
+                # Convert Chinese number
+                if len(chinese_num) == 1:
+                    day = self._chinese_nums.get(chinese_num, 0)
+                elif '十' in chinese_num:
+                    parts = chinese_num.split('十')
+                    tens = self._chinese_nums.get(parts[0], 1) if parts[0] else 1
+                    ones = self._chinese_nums.get(parts[1], 0) if len(parts) > 1 and parts[1] else 0
+                    day = tens * 10 + ones
+
+            if day == 0:
                 continue
 
             # Split content into potential activities
@@ -238,10 +334,14 @@ class TravelPlanParser:
                 cost = 0.0
                 price_match = self.price_pattern.search(line)
                 if price_match:
-                    try:
-                        cost = float((price_match.group(1) or price_match.group(2)).replace(",", ""))
-                    except (ValueError, AttributeError):
-                        pass
+                    # Find first non-None group
+                    for group in price_match.groups():
+                        if group:
+                            try:
+                                cost = float(group.replace(",", ""))
+                                break
+                            except (ValueError, AttributeError):
+                                pass
 
                 activity = DayActivity(
                     day=day,
@@ -271,10 +371,14 @@ class TravelPlanParser:
                 price_match = self.price_pattern.search(hotel_text)
                 price = 0.0
                 if price_match:
-                    try:
-                        price = float((price_match.group(1) or price_match.group(2)).replace(",", ""))
-                    except (ValueError, AttributeError):
-                        pass
+                    # Find first non-None group
+                    for group in price_match.groups():
+                        if group:
+                            try:
+                                price = float(group.replace(",", ""))
+                                break
+                            except (ValueError, AttributeError):
+                                pass
 
                 accommodation = Accommodation(
                     name=hotel_text[:100].strip(),
@@ -304,10 +408,14 @@ class TravelPlanParser:
                 price_match = self.price_pattern.search(flight_text)
                 price = 0.0
                 if price_match:
-                    try:
-                        price = float((price_match.group(1) or price_match.group(2)).replace(",", ""))
-                    except (ValueError, AttributeError):
-                        pass
+                    # Find first non-None group
+                    for group in price_match.groups():
+                        if group:
+                            try:
+                                price = float(group.replace(",", ""))
+                                break
+                            except (ValueError, AttributeError):
+                                pass
 
                 transport = Transportation(
                     type="Flight",
