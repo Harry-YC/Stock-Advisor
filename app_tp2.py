@@ -37,30 +37,20 @@ logger = logging.getLogger(__name__)
 # Password Authentication (Railway only)
 # =============================================================================
 
-@cl.password_auth_callback
-def auth_callback(username: str, password: str):
-    """
-    Password authentication for Railway deployment.
+# Only enable password auth if APP_PASS1 or APP_PASS2 is set
+_valid_passwords = []
+if os.environ.get("APP_PASS1"):
+    _valid_passwords.append(os.environ.get("APP_PASS1"))
+if os.environ.get("APP_PASS2"):
+    _valid_passwords.append(os.environ.get("APP_PASS2"))
 
-    Checks APP_PASS1 and APP_PASS2 environment variables.
-    Returns None (disabled) if no passwords are configured.
-    """
-    # Get passwords from environment (set on Railway, not locally)
-    valid_passwords = []
-    if os.environ.get("APP_PASS1"):
-        valid_passwords.append(os.environ.get("APP_PASS1"))
-    if os.environ.get("APP_PASS2"):
-        valid_passwords.append(os.environ.get("APP_PASS2"))
-
-    # If no passwords configured, allow access (local development)
-    if not valid_passwords:
-        return cl.User(identifier="local_user", metadata={"role": "user"})
-
-    # Check if provided password matches any configured password
-    if password in valid_passwords:
-        return cl.User(identifier=username, metadata={"role": "user"})
-
-    return None  # Authentication failed
+if _valid_passwords:
+    @cl.password_auth_callback
+    def auth_callback(username: str, password: str):
+        """Password authentication for Railway deployment."""
+        if password in _valid_passwords:
+            return cl.User(identifier=username, metadata={"role": "user"})
+        return None  # Authentication failed
 
 
 # =============================================================================
