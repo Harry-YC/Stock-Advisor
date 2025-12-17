@@ -168,42 +168,69 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
             "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
         }
 
-        # Try to extract day, month, year from various formats
-        # Patterns: "26Dec2025", "Dec 26 2025", "December 26, 2025", "26 December 2025"
         day = None
         month_num = None
         year = None
+        parsed = False
 
-        # Find month
-        for month_name, m_num in months.items():
-            if month_name in dates_lower:
-                month_num = m_num
-                break
+        # Try numeric formats first: "1-6-2026", "1/6/2026", "2026-1-6"
+        # Pattern: M-D-YYYY or M/D/YYYY (common US format)
+        numeric_match = re.search(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', dates_str)
+        if numeric_match:
+            m, d, y = int(numeric_match.group(1)), int(numeric_match.group(2)), int(numeric_match.group(3))
+            # Determine if M-D-Y or D-M-Y based on values
+            if m <= 12 and d <= 31:
+                # Assume M-D-Y (US format) for values like 1-6-2026
+                month_num, day, year = m, d, y
+                parsed = True
+            elif d <= 12 and m <= 31:
+                # D-M-Y format
+                day, month_num, year = m, d, y
+                parsed = True
 
-        if month_num:
-            # Extract numbers from the string
-            numbers = re.findall(r'\d+', dates_str)
-            for num_str in numbers:
-                num = int(num_str)
-                if num >= 2024 and num <= 2030:  # Year
-                    year = num
-                elif num >= 1 and num <= 31 and day is None:  # Day
-                    day = num
+        # Try ISO format: "2026-1-6" or "2026-01-06"
+        if not parsed:
+            iso_match = re.search(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})', dates_str)
+            if iso_match:
+                year, month_num, day = int(iso_match.group(1)), int(iso_match.group(2)), int(iso_match.group(3))
+                parsed = True
 
-            # Set defaults if not found
-            if year is None:
-                year = date.today().year
-                if month_num < date.today().month:
-                    year += 1
-            if day is None:
-                day = 15  # Mid-month default
+        # Try month name formats: "26Dec2025", "Dec 26 2025", "December 26, 2025"
+        if not parsed:
+            for month_name, m_num in months.items():
+                if month_name in dates_lower:
+                    month_num = m_num
+                    break
 
-            try:
-                departure = date(year, month_num, day)
-                return_date = departure + timedelta(days=duration or 7)
-            except ValueError:
-                # Invalid date, use defaults
-                pass
+            if month_num:
+                numbers = re.findall(r'\d+', dates_str)
+                for num_str in numbers:
+                    num = int(num_str)
+                    if num >= 2024 and num <= 2030:  # Year
+                        year = num
+                    elif num >= 1 and num <= 31 and day is None:  # Day
+                        day = num
+                parsed = month_num is not None
+
+        # Set defaults if not fully parsed
+        if year is None:
+            year = date.today().year
+            if month_num and month_num < date.today().month:
+                year += 1
+        if day is None:
+            day = 15  # Mid-month default
+        if month_num is None:
+            month_num = date.today().month + 1
+            if month_num > 12:
+                month_num = 1
+                year += 1
+
+        try:
+            departure = date(year, month_num, day)
+            return_date = departure + timedelta(days=duration or 7)
+        except ValueError:
+            # Invalid date, use defaults
+            pass
 
     # Map travelers string to select value
     travelers_str = trip_info.get("travelers", "2 adults")
