@@ -188,7 +188,7 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
 
     # Try to parse specific dates if provided
     if dates_str:
-        # Simple heuristics - could be enhanced
+        import re
         dates_lower = dates_str.lower()
         months = {
             "january": 1, "february": 2, "march": 3, "april": 4,
@@ -197,15 +197,43 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
             "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7,
             "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
         }
-        for month_name, month_num in months.items():
+
+        # Try to extract day, month, year from various formats
+        # Patterns: "26Dec2025", "Dec 26 2025", "December 26, 2025", "26 December 2025"
+        day = None
+        month_num = None
+        year = None
+
+        # Find month
+        for month_name, m_num in months.items():
             if month_name in dates_lower:
+                month_num = m_num
+                break
+
+        if month_num:
+            # Extract numbers from the string
+            numbers = re.findall(r'\d+', dates_str)
+            for num_str in numbers:
+                num = int(num_str)
+                if num >= 2024 and num <= 2030:  # Year
+                    year = num
+                elif num >= 1 and num <= 31 and day is None:  # Day
+                    day = num
+
+            # Set defaults if not found
+            if year is None:
                 year = date.today().year
-                # If month is in the past this year, use next year
                 if month_num < date.today().month:
                     year += 1
-                departure = date(year, month_num, 15)  # Mid-month default
+            if day is None:
+                day = 15  # Mid-month default
+
+            try:
+                departure = date(year, month_num, day)
                 return_date = departure + timedelta(days=duration or 7)
-                break
+            except ValueError:
+                # Invalid date, use defaults
+                pass
 
     # Map travelers string to select value
     travelers_str = trip_info.get("travelers", "2 adults")
