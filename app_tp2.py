@@ -34,37 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Password Authentication (Railway only)
-# =============================================================================
-
-def _get_valid_passwords():
-    """Get configured passwords from environment."""
-    passwords = []
-    p1 = os.environ.get("APP_PASS1")
-    p2 = os.environ.get("APP_PASS2")
-    if p1:
-        passwords.append(p1)
-    if p2:
-        passwords.append(p2)
-    return passwords
-
-# Check at module load - Railway env vars should be available
-_AUTH_ENABLED = bool(_get_valid_passwords())
-logger.info(f"Password auth enabled: {_AUTH_ENABLED}")
-
-if _AUTH_ENABLED:
-    @cl.password_auth_callback
-    def auth_callback(username: str, password: str):
-        """Password authentication for Railway deployment."""
-        valid_passwords = _get_valid_passwords()
-        if password in valid_passwords:
-            logger.info(f"Auth success for user: {username}")
-            return cl.User(identifier=username, metadata={"role": "user"})
-        logger.warning(f"Auth failed for user: {username}")
-        return None
-
-
-# =============================================================================
 # LLM-Guided Intake Conversation
 # =============================================================================
 
