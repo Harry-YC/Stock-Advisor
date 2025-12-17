@@ -37,20 +37,31 @@ logger = logging.getLogger(__name__)
 # Password Authentication (Railway only)
 # =============================================================================
 
-# Only enable password auth if APP_PASS1 or APP_PASS2 is set
-_valid_passwords = []
-if os.environ.get("APP_PASS1"):
-    _valid_passwords.append(os.environ.get("APP_PASS1"))
-if os.environ.get("APP_PASS2"):
-    _valid_passwords.append(os.environ.get("APP_PASS2"))
+def _get_valid_passwords():
+    """Get configured passwords from environment."""
+    passwords = []
+    p1 = os.environ.get("APP_PASS1")
+    p2 = os.environ.get("APP_PASS2")
+    if p1:
+        passwords.append(p1)
+    if p2:
+        passwords.append(p2)
+    return passwords
 
-if _valid_passwords:
+# Check at module load - Railway env vars should be available
+_AUTH_ENABLED = bool(_get_valid_passwords())
+logger.info(f"Password auth enabled: {_AUTH_ENABLED}")
+
+if _AUTH_ENABLED:
     @cl.password_auth_callback
     def auth_callback(username: str, password: str):
         """Password authentication for Railway deployment."""
-        if password in _valid_passwords:
+        valid_passwords = _get_valid_passwords()
+        if password in valid_passwords:
+            logger.info(f"Auth success for user: {username}")
             return cl.User(identifier=username, metadata={"role": "user"})
-        return None  # Authentication failed
+        logger.warning(f"Auth failed for user: {username}")
+        return None
 
 
 # =============================================================================
