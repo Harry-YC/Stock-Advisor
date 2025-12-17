@@ -540,14 +540,14 @@ async def on_message(message: cl.Message):
         await handle_plan_trip(trip_config)
         return
 
-    # Check for on-demand car rental request
-    if "car" in user_input and ("rental" in user_input or "rent" in user_input):
-        await handle_car_rental_request(trip_config, trip_data)
-        return
-
-    # If in intake mode, handle conversationally
+    # If in intake mode, handle conversationally (before other keyword checks)
     if intake_mode:
         await handle_intake_message(message.content)
+        return
+
+    # Check for on-demand car rental request (only after trip is planned)
+    if "car" in user_input and ("rental" in user_input or "rent" in user_input):
+        await handle_car_rental_request(trip_config, trip_data)
         return
 
     # Check for specific expert request
