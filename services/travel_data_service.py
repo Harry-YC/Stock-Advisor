@@ -491,8 +491,16 @@ Be concise - max 5-6 bullet points."""
 """
 
         if data.get("weather"):
-            summary += f"""## WEATHER FORECAST (Real Data)
-{data['weather']}
+            weather_data = data['weather']
+            # Check if it's historical or real-time
+            if "Historical Weather" in weather_data:
+                summary += f"""## WEATHER (Historical Patterns)
+{weather_data}
+
+"""
+            else:
+                summary += f"""## WEATHER FORECAST (Real-Time)
+{weather_data}
 
 """
 
