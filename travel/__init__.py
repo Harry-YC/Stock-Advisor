@@ -1,12 +1,12 @@
 """
 Travel Planner - Expert Personas and Templates
 
-8 travel expert roles for comprehensive trip planning and recommendations.
+9 travel expert roles for comprehensive trip planning and recommendations.
 """
 
 from .travel_personas import (
     TRAVEL_EXPERTS,
-    TRAVEL_BASE_CONTEXT,
+    get_travel_base_context,
     TRAVEL_CATEGORIES,
     TRAVEL_PRESETS,
     get_travel_prompts,
@@ -21,7 +21,7 @@ from .travel_templates import (
 
 __all__ = [
     "TRAVEL_EXPERTS",
-    "TRAVEL_BASE_CONTEXT",
+    "get_travel_base_context",
     "TRAVEL_CATEGORIES",
     "TRAVEL_PRESETS",
     "get_travel_prompts",

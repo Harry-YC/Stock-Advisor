@@ -16,12 +16,17 @@ Travel Planner - Expert Personas
 from typing import Dict, Tuple, List, Optional
 
 # Base context for all Travel Experts
-TRAVEL_BASE_CONTEXT = (
-    "You are a travel planning expert helping users plan their trips. "
-    "Provide practical, actionable advice based on real travel data and experiences. "
-    "Focus on: value for money, safety, authentic experiences, and logistics. "
-    "Return clear, organized recommendations. "
-    "Each point should be specific and actionable. "
+def get_travel_base_context():
+    """Get base context with current date injected."""
+    from datetime import date
+    today = date.today()
+    return (
+        f"TODAY'S DATE: {today.strftime('%B %d, %Y')} (This is the current date - use it for all time references)\n\n"
+        "You are a travel planning expert helping users plan their trips. "
+        "Provide practical, actionable advice based on real travel data and experiences. "
+        "Focus on: value for money, safety, authentic experiences, and logistics. "
+        "Return clear, organized recommendations. "
+        "Each point should be specific and actionable. "
     "\n\n"
     "RESPONSE GUIDELINES:\n"
     "- When real-time data is provided (flights, hotels, prices), ANALYZE IT and make "
@@ -539,7 +544,7 @@ def get_travel_prompts(bullets_per_role: int = 10) -> Dict[str, Tuple[str, str]]
     prompts = {}
 
     for name, config in TRAVEL_EXPERTS.items():
-        context = TRAVEL_BASE_CONTEXT + f"\n\nYour Role: {config['role']}\n"
+        context = get_travel_base_context() + f"\n\nYour Role: {config['role']}\n"
         context += f"Specialty: {config['specialty']}\n"
         context += f"Perspective: {config['perspective']}\n"
 
