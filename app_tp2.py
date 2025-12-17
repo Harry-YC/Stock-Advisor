@@ -133,7 +133,7 @@ async def handle_intake_message(message: str):
     trip_info = cl.user_session.get("trip_info", {})
 
     # Show spinner while extracting info
-    async with cl.Step(name="Trip Details", type="run") as step:
+    async with cl.Step(name="Trip Info Extractor", type="run") as step:
         trip_info = await extract_trip_info(message, trip_info)
         cl.user_session.set("trip_info", trip_info)
 
@@ -622,7 +622,7 @@ async def handle_plan_trip(trip_config: Dict):
     ).send()
 
     # Fetch travel data
-    async with cl.Step(name="Travel Data", type="tool") as step:
+    async with cl.Step(name="Data Fetcher", type="tool") as step:
         try:
             trip_data = travel_service.fetch_travel_data(
                 destination=destination,
@@ -651,7 +651,7 @@ async def handle_plan_trip(trip_config: Dict):
 
     # Safety Expert always gets search context (advisories, visa, health)
     if "Safety Expert" in selected_experts:
-        async with cl.Step(name="Travel Advisories", type="tool") as step:
+        async with cl.Step(name="Advisory Lookup", type="tool") as step:
             try:
                 advisories = travel_service.fetch_safety_advisories(destination)
                 if advisories:
@@ -666,7 +666,7 @@ async def handle_plan_trip(trip_config: Dict):
     # For near-term trips (< 30 days), fetch current events for all experts
     days_until_departure = (departure - date.today()).days
     if days_until_departure <= 30:
-        async with cl.Step(name="Current Events", type="tool") as step:
+        async with cl.Step(name="Event Lookup", type="tool") as step:
             try:
                 events = travel_service.fetch_current_events(destination, departure)
                 if events:
@@ -791,7 +791,7 @@ async def handle_car_rental_request(trip_config: Dict, trip_data: Optional[Dict]
 
     await cl.Message(content=f"Looking for car rentals in {destination}...").send()
 
-    async with cl.Step(name="Car Rentals", type="tool") as step:
+    async with cl.Step(name="Car Finder", type="tool") as step:
         try:
             car_data = travel_service.fetch_car_rentals_on_demand(
                 destination=destination,
