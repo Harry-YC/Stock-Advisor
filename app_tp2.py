@@ -34,6 +34,36 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Password Authentication (Railway only)
+# =============================================================================
+
+@cl.password_auth_callback
+def auth_callback(username: str, password: str):
+    """
+    Password authentication for Railway deployment.
+
+    Checks APP_PASS1 and APP_PASS2 environment variables.
+    Returns None (disabled) if no passwords are configured.
+    """
+    # Get passwords from environment (set on Railway, not locally)
+    valid_passwords = []
+    if os.environ.get("APP_PASS1"):
+        valid_passwords.append(os.environ.get("APP_PASS1"))
+    if os.environ.get("APP_PASS2"):
+        valid_passwords.append(os.environ.get("APP_PASS2"))
+
+    # If no passwords configured, allow access (local development)
+    if not valid_passwords:
+        return cl.User(identifier="local_user", metadata={"role": "user"})
+
+    # Check if provided password matches any configured password
+    if password in valid_passwords:
+        return cl.User(identifier=username, metadata={"role": "user"})
+
+    return None  # Authentication failed
+
+
+# =============================================================================
 # LLM-Guided Intake Conversation
 # =============================================================================
 
@@ -144,93 +174,179 @@ async def handle_intake_message(message: str):
         await handle_plan_trip(trip_config)
 
 
+def parse_flexible_date(date_str: str, default_year: int = None) -> date:
+    """
+    Parse dates from various formats using dateutil with fallbacks.
+
+    Supports:
+    - ISO: 2026-01-06, 2026/1/6
+    - US: 1-6-2026, 1/6/2026, 01/06/2026
+    - EU: 6-1-2026, 6/1/2026 (when day > 12)
+    - Month names: Jan 6 2026, 6 Jan 2026, January 6, 2026, 6Jan2026
+    - Compact: 20260106
+    - Relative: next week, in 2 weeks, next month
+    """
+    import re
+    from datetime import timedelta
+    from dateutil import parser as dateutil_parser
+
+    if not date_str:
+        return None
+
+    date_str = date_str.strip()
+    today = date.today()
+    default_year = default_year or today.year
+
+    # Handle relative dates first
+    date_lower = date_str.lower()
+    if 'next week' in date_lower:
+        return today + timedelta(days=7)
+    if 'next month' in date_lower:
+        return date(today.year + (1 if today.month == 12 else 0),
+                   (today.month % 12) + 1, min(today.day, 28))
+    if 'tomorrow' in date_lower:
+        return today + timedelta(days=1)
+
+    # "in X days/weeks/months"
+    in_match = re.search(r'in\s+(\d+)\s*(day|week|month)', date_lower)
+    if in_match:
+        num, unit = int(in_match.group(1)), in_match.group(2)
+        if unit == 'day':
+            return today + timedelta(days=num)
+        elif unit == 'week':
+            return today + timedelta(weeks=num)
+        elif unit == 'month':
+            new_month = today.month + num
+            new_year = today.year + (new_month - 1) // 12
+            new_month = ((new_month - 1) % 12) + 1
+            return date(new_year, new_month, min(today.day, 28))
+
+    # Try dateutil parser first (handles many formats automatically)
+    try:
+        # dayfirst=False for US format (M/D/Y), yearfirst for ISO
+        parsed = dateutil_parser.parse(date_str, dayfirst=False, yearfirst=False, fuzzy=True)
+        result = parsed.date()
+        # If year is current year but date is in past, assume next year
+        if result < today and result.year == today.year:
+            result = date(result.year + 1, result.month, result.day)
+        return result
+    except (ValueError, TypeError):
+        pass
+
+    # Manual parsing for edge cases dateutil misses
+
+    # Compact format without separators: "6Jan2026" or "Jan62026"
+    compact_match = re.search(r'(\d{1,2})([a-zA-Z]{3,9})(\d{4})', date_str)
+    if compact_match:
+        day_str, month_str, year_str = compact_match.groups()
+        try:
+            parsed = dateutil_parser.parse(f"{month_str} {day_str}, {year_str}")
+            return parsed.date()
+        except:
+            pass
+
+    # Reverse compact: "Jan6,2026"
+    compact_match2 = re.search(r'([a-zA-Z]{3,9})(\d{1,2}),?\s*(\d{4})', date_str)
+    if compact_match2:
+        month_str, day_str, year_str = compact_match2.groups()
+        try:
+            parsed = dateutil_parser.parse(f"{month_str} {day_str}, {year_str}")
+            return parsed.date()
+        except:
+            pass
+
+    return None
+
+
+def parse_date_range(dates_str: str, duration: int = None) -> tuple:
+    """
+    Parse a date range string and return (departure, return_date).
+
+    Supports:
+    - "1-6-2026 to 1-9-2026"
+    - "Jan 6 - Jan 9, 2026"
+    - "6-9 January 2026"
+    - "from Jan 6 to Jan 9"
+    - Single date with duration
+    """
+    import re
+    from datetime import timedelta
+
+    if not dates_str:
+        # Default to 30 days from now
+        departure = date.today() + timedelta(days=30)
+        return_date = departure + timedelta(days=duration or 7)
+        return departure, return_date
+
+    dates_str = dates_str.strip()
+
+    # Split on range indicators
+    range_patterns = [
+        r'\s+to\s+',           # "X to Y"
+        r'\s*-\s*(?=[a-zA-Z])', # "X - Y" where Y starts with letter (not numeric date)
+        r'\s+through\s+',      # "X through Y"
+        r'\s+until\s+',        # "X until Y"
+        r'\s+till\s+',         # "X till Y"
+    ]
+
+    start_str = None
+    end_str = None
+
+    for pattern in range_patterns:
+        parts = re.split(pattern, dates_str, maxsplit=1, flags=re.IGNORECASE)
+        if len(parts) == 2:
+            start_str, end_str = parts[0].strip(), parts[1].strip()
+            break
+
+    # Try to find two separate date patterns in the string
+    if not start_str:
+        # Pattern for dates like "1-6-2026" or "1/6/2026"
+        date_patterns = re.findall(r'\d{1,2}[-/]\d{1,2}[-/]\d{4}|\d{4}[-/]\d{1,2}[-/]\d{1,2}', dates_str)
+        if len(date_patterns) >= 2:
+            start_str, end_str = date_patterns[0], date_patterns[1]
+        elif len(date_patterns) == 1:
+            start_str = date_patterns[0]
+
+    # Parse the dates
+    departure = None
+    return_date = None
+
+    if start_str:
+        departure = parse_flexible_date(start_str)
+
+    if end_str:
+        # If end date doesn't have year, inherit from start
+        if departure and not re.search(r'\d{4}', end_str):
+            end_str = f"{end_str} {departure.year}"
+        return_date = parse_flexible_date(end_str)
+
+    # Fallbacks
+    if not departure:
+        departure = date.today() + timedelta(days=30)
+
+    if not return_date:
+        if duration:
+            return_date = departure + timedelta(days=duration)
+        else:
+            return_date = departure + timedelta(days=7)
+
+    # Sanity check: return_date should be after departure
+    if return_date <= departure:
+        return_date = departure + timedelta(days=duration or 7)
+
+    return departure, return_date
+
+
 def convert_trip_info_to_config(trip_info: dict) -> dict:
     """Convert intake trip_info to the trip_config format used by handle_plan_trip."""
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     # Parse dates from natural language
     dates_str = trip_info.get("dates", "")
     duration = trip_info.get("duration_days")
 
-    # Default to 30 days from now, 7 days duration
-    departure = date.today() + timedelta(days=30)
-    return_date = departure + timedelta(days=duration or 7)
-
-    # Try to parse specific dates if provided
-    if dates_str:
-        import re
-        dates_lower = dates_str.lower()
-        months = {
-            "january": 1, "february": 2, "march": 3, "april": 4,
-            "may": 5, "june": 6, "july": 7, "august": 8,
-            "september": 9, "october": 10, "november": 11, "december": 12,
-            "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7,
-            "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
-        }
-
-        day = None
-        month_num = None
-        year = None
-        parsed = False
-
-        # Try numeric formats first: "1-6-2026", "1/6/2026", "2026-1-6"
-        # Pattern: M-D-YYYY or M/D/YYYY (common US format)
-        numeric_match = re.search(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', dates_str)
-        if numeric_match:
-            m, d, y = int(numeric_match.group(1)), int(numeric_match.group(2)), int(numeric_match.group(3))
-            # Determine if M-D-Y or D-M-Y based on values
-            if m <= 12 and d <= 31:
-                # Assume M-D-Y (US format) for values like 1-6-2026
-                month_num, day, year = m, d, y
-                parsed = True
-            elif d <= 12 and m <= 31:
-                # D-M-Y format
-                day, month_num, year = m, d, y
-                parsed = True
-
-        # Try ISO format: "2026-1-6" or "2026-01-06"
-        if not parsed:
-            iso_match = re.search(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})', dates_str)
-            if iso_match:
-                year, month_num, day = int(iso_match.group(1)), int(iso_match.group(2)), int(iso_match.group(3))
-                parsed = True
-
-        # Try month name formats: "26Dec2025", "Dec 26 2025", "December 26, 2025"
-        if not parsed:
-            for month_name, m_num in months.items():
-                if month_name in dates_lower:
-                    month_num = m_num
-                    break
-
-            if month_num:
-                numbers = re.findall(r'\d+', dates_str)
-                for num_str in numbers:
-                    num = int(num_str)
-                    if num >= 2024 and num <= 2030:  # Year
-                        year = num
-                    elif num >= 1 and num <= 31 and day is None:  # Day
-                        day = num
-                parsed = month_num is not None
-
-        # Set defaults if not fully parsed
-        if year is None:
-            year = date.today().year
-            if month_num and month_num < date.today().month:
-                year += 1
-        if day is None:
-            day = 15  # Mid-month default
-        if month_num is None:
-            month_num = date.today().month + 1
-            if month_num > 12:
-                month_num = 1
-                year += 1
-
-        try:
-            departure = date(year, month_num, day)
-            return_date = departure + timedelta(days=duration or 7)
-        except ValueError:
-            # Invalid date, use defaults
-            pass
+    # Use the flexible date range parser
+    departure, return_date = parse_date_range(dates_str, duration)
 
     # Map travelers string to select value
     travelers_str = trip_info.get("travelers", "2 adults")
