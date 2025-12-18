@@ -83,6 +83,7 @@ English Examples:
 - "a week in mid-January" -> {{"destination": null, "origin": null, "departure_date": "mid-January", "return_date": null, "duration_days": 7, "travelers": null, "budget": null}}
 - "two nights" or "for 2 nights" -> {{"duration_days": 3, ...}} (nights + 1 = total days)
 - "three nights" -> {{"duration_days": 4, ...}} (nights + 1 = total days)
+- "leaving today" or "departing today" -> {{"departure_date": "today", ...}}
 - "myself" or "just me" or "solo" -> {{"travelers": "1 adult (solo)"}}
 - "me and my brother" or "with my sister" -> {{"travelers": "2 adults (siblings)"}}
 - "foodie trip" -> extract "foodie" as a travel style hint, not travelers
@@ -90,8 +91,10 @@ English Examples:
 Traditional Chinese Examples (繁體中文):
 - "我想去東京" -> {{"destination": "Tokyo, Japan", "origin": null, ...}}
 - "從台北出發去巴黎" -> {{"destination": "Paris, France", "origin": "Taipei", ...}}
+- "今天出發" -> {{"departure_date": "today", ...}}
 - "2026年1月6日出發" or "一月六號出發" -> {{"departure_date": "Jan 6, 2026", ...}}
 - "一月六號到一月九號" -> {{"departure_date": "Jan 6", "return_date": "Jan 9", ...}}
+- "兩夜" or "兩晚" -> {{"duration_days": 3, ...}} (nights + 1 = total days)
 - "三天兩夜" -> {{"duration_days": 3, ...}}
 - "五天四夜" -> {{"duration_days": 5, ...}}
 - "一週" or "一個禮拜" -> {{"duration_days": 7, ...}}
@@ -388,6 +391,8 @@ def parse_flexible_date(date_str: str, default_year: int = None) -> date:
                 return result
 
     # Handle Chinese relative dates
+    if '今天' in date_str:
+        return today
     if '下個月' in date_str or '下个月' in date_str:
         return date(today.year + (1 if today.month == 12 else 0),
                    (today.month % 12) + 1, min(today.day, 28))
@@ -400,6 +405,8 @@ def parse_flexible_date(date_str: str, default_year: int = None) -> date:
 
     # Handle relative dates first (English)
     date_lower = date_str.lower()
+    if 'today' in date_lower:
+        return today
     if 'next week' in date_lower:
         return today + timedelta(days=7)
     if 'next month' in date_lower:
