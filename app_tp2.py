@@ -1093,8 +1093,9 @@ async def on_message(message: cl.Message):
         await handle_plan_trip(trip_config)
         return
 
-    # If in intake mode, handle conversationally (before other keyword checks)
-    if intake_mode:
+    # If in intake mode AND no trip has been planned yet, handle conversationally
+    # Once trip_data exists, treat all messages as follow-ups to the planned trip
+    if intake_mode and not trip_data:
         await handle_intake_message(message.content)
         return
 
