@@ -8,6 +8,7 @@ SQLite persistence for conversation history.
 Run with: chainlit run app.py
 """
 
+import asyncio
 import chainlit as cl
 import chainlit.data as cl_data
 from chainlit.input_widget import TextInput, Select, Slider
@@ -27,6 +28,7 @@ from travel.travel_personas import (
     TRAVEL_PRESETS,
     EXPERT_ICONS,
     get_default_travel_experts,
+    call_travel_expert,
     call_travel_expert_stream
 )
 
@@ -1113,6 +1115,35 @@ async def on_message(message: cl.Message):
     await handle_followup(message.content, trip_config, trip_data)
 
 
+# =============================================================================
+# Parallel Expert Execution
+# =============================================================================
+
+async def call_expert_async(expert_name: str, destination: str, expert_context: str) -> tuple:
+    """
+    Run single expert LLM call asynchronously.
+
+    Returns (expert_name, response_content) tuple.
+    Uses run_in_executor to run blocking LLM call without blocking event loop.
+    """
+    loop = asyncio.get_event_loop()
+
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: call_travel_expert(
+                persona_name=expert_name,
+                clinical_question=f"Plan a trip to {destination}",
+                evidence_context=expert_context,
+                openai_api_key=settings.GEMINI_API_KEY
+            )
+        )
+        return (expert_name, response.get('content', ''))
+    except Exception as e:
+        logger.error(f"Expert {expert_name} failed: {e}")
+        return (expert_name, f"*Error: {e}*")
+
+
 async def handle_plan_trip(trip_config: Dict):
     """Execute full trip planning with expert panel."""
 
@@ -1232,46 +1263,61 @@ async def handle_plan_trip(trip_config: Dict):
         user_prefs.append(f"- Special interests: {special_interests}")
     user_prefs_context = "\n\n## USER PREFERENCES\n" + "\n".join(user_prefs) if user_prefs else ""
 
-    # Run experts and stream responses
+    # Run experts in parallel with progress updates
     expert_responses = {}
+    completed_experts = []
 
+    # Show progress message
+    expert_icons_list = [f"{EXPERT_ICONS.get(e, '🧭')} {e.split()[0]}" for e in selected_experts]
+    progress_msg = await cl.Message(
+        content=f"🔄 **Consulting {len(selected_experts)} experts in parallel...**\n\n"
+                f"Waiting: {', '.join(expert_icons_list)}"
+    ).send()
+
+    # Helper to run expert and update progress
+    async def run_expert_with_progress(expert_name: str, context: str) -> tuple:
+        result = await call_expert_async(expert_name, destination, context)
+        completed_experts.append(expert_name)
+
+        # Update progress message
+        done = [f"✅ {EXPERT_ICONS.get(e, '')} {e.split()[0]}" for e in completed_experts]
+        pending = [f"⏳ {EXPERT_ICONS.get(e, '')} {e.split()[0]}"
+                   for e in selected_experts if e not in completed_experts]
+        status = " | ".join(done)
+        if pending:
+            status += "\n\nWaiting: " + ", ".join(pending)
+        await progress_msg.update(
+            content=f"🔄 **Consulting experts...**\n\n{status}"
+        )
+        return result
+
+    # Build tasks for all experts
+    tasks = []
     for expert_name in selected_experts:
-        icon = EXPERT_ICONS.get(expert_name, "🧭")
-        msg = cl.Message(content="", author=f"{icon} {expert_name}")
-
-        expert_info = TRAVEL_EXPERTS.get(expert_name, {})
-        role = expert_info.get("role", expert_name)
-
-        # Add header with icon
-        await msg.stream_token(f"## {icon} {expert_name}\n*{role}*\n\n")
-
-        # Build context with user prefs + trip data + any Google Search data
         expert_context = user_prefs_context + "\n\n" + trip_data.get("summary", "")
         if expert_name in search_contexts:
             expert_context += search_contexts[expert_name]
+        tasks.append(run_expert_with_progress(expert_name, expert_context))
 
-        # Stream expert response
-        full_response = ""
-        try:
-            for chunk in call_travel_expert_stream(
-                persona_name=expert_name,
-                clinical_question=f"Plan a trip to {destination}",
-                evidence_context=expert_context,
-                model=settings.EXPERT_MODEL,
-                openai_api_key=settings.GEMINI_API_KEY
-            ):
-                if chunk.get("type") == "chunk":
-                    content = chunk.get("content", "")
-                    full_response += content
-                    await msg.stream_token(content)
-                elif chunk.get("type") == "error":
-                    await msg.stream_token(f"\n\n*Error: {chunk.get('content')}*")
-        except Exception as e:
-            logger.error(f"Expert {expert_name} failed: {e}")
-            await msg.stream_token(f"\n\n*Error getting response: {e}*")
+    # Run all experts in parallel
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        await msg.send()
-        expert_responses[expert_name] = full_response
+    # Update progress to show all done
+    await progress_msg.update(content="✅ **All experts ready!** Displaying results...")
+
+    # Display results in order
+    for expert_name, response in results:
+        if isinstance(response, Exception):
+            logger.error(f"Expert {expert_name} failed: {response}")
+            response = f"*Error: {response}*"
+
+        icon = EXPERT_ICONS.get(expert_name, "🧭")
+        expert_info = TRAVEL_EXPERTS.get(expert_name, {})
+        role = expert_info.get("role", expert_name)
+
+        content = f"## {icon} {expert_name}\n*{role}*\n\n{response}"
+        await cl.Message(content=content, author=f"{icon} {expert_name}").send()
+        expert_responses[expert_name] = response
 
     # Store responses
     cl.user_session.set("expert_responses", expert_responses)
