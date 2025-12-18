@@ -1196,7 +1196,7 @@ async def handle_plan_trip(trip_config: Dict):
     if origin:
         user_prefs.append(f"- Origin/Flying from: {origin} (look for DIRECT flights first)")
     user_prefs.append(f"- Travelers: {trip_config.get('travelers', '2 adults')}")
-    user_prefs.append(f"- Budget: ${trip_config.get('budget', 5000):,} {trip_config.get('budget_currency', 'USD')}")
+    user_prefs.append(f"- TOTAL BUDGET: ${trip_config.get('budget', 5000):,} {trip_config.get('budget_currency', 'USD')} (this covers ALL expenses: flights, hotels, food, activities, transport)")
     if travel_style:
         user_prefs.append(f"- Travel style: {travel_style}")
     if special_interests:
