@@ -52,7 +52,8 @@ User message: "{user_message}"
 
 Return JSON with these fields (use null if not mentioned):
 {{
-  "destination": "city/country or null",
+  "destination": "city/country or null (for multi-city, use comma-separated like 'Tokyo, Japan -> Kyoto, Japan -> Osaka, Japan')",
+  "is_multi_city": true if multiple cities mentioned, false otherwise,
   "origin": "departure city/country or null",
   "departure_date": "date string or null",
   "return_date": "date string or null",
@@ -69,10 +70,13 @@ IMPORTANT RULES:
 2. "today" or "leaving today" -> departure_date: "today"
 3. "returning on", "back on", "until" indicate RETURN date, not departure
 4. If both duration and return date given, use return date and calculate departure
+5. MULTI-CITY: "Tokyo then Kyoto" or "Paris, Rome, Barcelona" -> destination: "Tokyo, Japan -> Kyoto, Japan", is_multi_city: true
 
 Examples:
-- "Barcelona next month with my wife" -> {{"destination": "Barcelona, Spain", "departure_date": "next month", "travelers": "2 adults (couple)"}}
-- "Tokyo from San Francisco" -> {{"destination": "Tokyo, Japan", "origin": "San Francisco"}}
+- "Barcelona next month with my wife" -> {{"destination": "Barcelona, Spain", "is_multi_city": false, "departure_date": "next month", "travelers": "2 adults (couple)"}}
+- "Tokyo from San Francisco" -> {{"destination": "Tokyo, Japan", "is_multi_city": false, "origin": "San Francisco"}}
+- "Tokyo then Kyoto for 7 days" -> {{"destination": "Tokyo, Japan -> Kyoto, Japan", "is_multi_city": true, "duration_days": 7}}
+- "Paris, Barcelona, and Rome" -> {{"destination": "Paris, France -> Barcelona, Spain -> Rome, Italy", "is_multi_city": true}}
 - "3 day trip returning on Jan 9" -> {{"return_date": "Jan 9", "duration_days": 3}}
 - "trip from Jan 6 to Jan 9" -> {{"departure_date": "Jan 6", "return_date": "Jan 9"}}
 - "two nights" -> {{"duration_days": 3}}

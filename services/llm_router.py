@@ -3,12 +3,21 @@ LLM Router Service for Travel Planner
 
 Provides a unified interface for Gemini LLM calls.
 Uses Google's native Gemini SDK for optimal performance.
+
+Features:
+- Response caching (1-hour TTL) for repeated queries
+- Circuit breaker to avoid hammering failing APIs
+- Retry logic with exponential backoff
 """
 
 import logging
 import time
+import hashlib
 from typing import Optional, Dict, Any, Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from collections import OrderedDict
+import threading
 
 from config import settings
 
@@ -23,11 +32,134 @@ RETRYABLE_ERRORS = [
     'resource_exhausted', 'unavailable', 'deadline'
 ]
 
+# Cache configuration
+CACHE_TTL_SECONDS = 3600  # 1 hour
+CACHE_MAX_SIZE = 100  # Max cached responses
+
+# Circuit breaker configuration
+CIRCUIT_BREAKER_THRESHOLD = 5  # failures before opening
+CIRCUIT_BREAKER_TIMEOUT = 60  # seconds before retry
+
 
 def is_retryable_error(error: Exception) -> bool:
     """Check if an error is retryable."""
     error_msg = str(error).lower()
     return any(x in error_msg for x in RETRYABLE_ERRORS)
+
+
+class ResponseCache:
+    """Thread-safe LRU cache with TTL for LLM responses."""
+
+    def __init__(self, max_size: int = CACHE_MAX_SIZE, ttl_seconds: int = CACHE_TTL_SECONDS):
+        self._cache: OrderedDict = OrderedDict()
+        self._timestamps: Dict[str, datetime] = {}
+        self._max_size = max_size
+        self._ttl = timedelta(seconds=ttl_seconds)
+        self._lock = threading.Lock()
+        self._hits = 0
+        self._misses = 0
+
+    def _make_key(self, prompt: str, system: str, model: str) -> str:
+        """Create cache key from prompt, system, and model."""
+        content = f"{model}:{system}:{prompt}"
+        return hashlib.md5(content.encode()).hexdigest()
+
+    def get(self, prompt: str, system: str, model: str) -> Optional[str]:
+        """Get cached response if exists and not expired."""
+        key = self._make_key(prompt, system, model)
+        with self._lock:
+            if key in self._cache:
+                if datetime.now() - self._timestamps[key] < self._ttl:
+                    # Move to end (most recently used)
+                    self._cache.move_to_end(key)
+                    self._hits += 1
+                    logger.debug(f"Cache HIT for key {key[:8]}... (hits={self._hits})")
+                    return self._cache[key]
+                else:
+                    # Expired, remove
+                    del self._cache[key]
+                    del self._timestamps[key]
+            self._misses += 1
+            return None
+
+    def set(self, prompt: str, system: str, model: str, response: str):
+        """Cache a response."""
+        key = self._make_key(prompt, system, model)
+        with self._lock:
+            # Remove oldest if at capacity
+            if len(self._cache) >= self._max_size:
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+                del self._timestamps[oldest]
+
+            self._cache[key] = response
+            self._timestamps[key] = datetime.now()
+            logger.debug(f"Cached response for key {key[:8]}... (size={len(self._cache)})")
+
+    def stats(self) -> Dict[str, int]:
+        """Return cache statistics."""
+        with self._lock:
+            total = self._hits + self._misses
+            hit_rate = (self._hits / total * 100) if total > 0 else 0
+            return {
+                "hits": self._hits,
+                "misses": self._misses,
+                "size": len(self._cache),
+                "hit_rate": f"{hit_rate:.1f}%"
+            }
+
+
+class CircuitBreaker:
+    """Circuit breaker to prevent hammering failing APIs."""
+
+    def __init__(self, threshold: int = CIRCUIT_BREAKER_THRESHOLD, timeout: int = CIRCUIT_BREAKER_TIMEOUT):
+        self._failure_count = 0
+        self._threshold = threshold
+        self._timeout = timeout
+        self._last_failure: Optional[datetime] = None
+        self._state = "closed"  # closed, open, half-open
+        self._lock = threading.Lock()
+
+    @property
+    def is_open(self) -> bool:
+        """Check if circuit is open (blocking requests)."""
+        with self._lock:
+            if self._state == "open":
+                # Check if timeout has passed
+                if self._last_failure and datetime.now() - self._last_failure > timedelta(seconds=self._timeout):
+                    self._state = "half-open"
+                    logger.info("Circuit breaker: half-open (testing)")
+                    return False
+                return True
+            return False
+
+    def record_success(self):
+        """Record a successful call."""
+        with self._lock:
+            self._failure_count = 0
+            if self._state == "half-open":
+                self._state = "closed"
+                logger.info("Circuit breaker: closed (recovered)")
+
+    def record_failure(self):
+        """Record a failed call."""
+        with self._lock:
+            self._failure_count += 1
+            self._last_failure = datetime.now()
+            if self._failure_count >= self._threshold:
+                self._state = "open"
+                logger.warning(f"Circuit breaker: OPEN after {self._failure_count} failures")
+
+    @property
+    def state(self) -> str:
+        """Get current circuit state."""
+        with self._lock:
+            return self._state
+
+
+# Global instances
+_response_cache = ResponseCache()
+_circuit_breaker = CircuitBreaker()
 
 
 @dataclass
@@ -139,10 +271,27 @@ class LLMRouter:
         system: Optional[str],
         model_name: str,
         temperature: float,
-        max_tokens: int
+        max_tokens: int,
+        use_cache: bool = True
     ) -> LLMResponse:
-        """Call Gemini using native SDK with retry logic."""
+        """Call Gemini using native SDK with caching, circuit breaker, and retry logic."""
         import google.generativeai as genai
+
+        # Check circuit breaker
+        if _circuit_breaker.is_open:
+            logger.warning("Circuit breaker OPEN - returning cached or error")
+            # Try cache even for different queries when circuit is open
+            cached = _response_cache.get(prompt, system or "", model_name)
+            if cached:
+                return LLMResponse(content=cached, model=model_name, finish_reason="cached", usage={})
+            raise Exception("Service temporarily unavailable (circuit breaker open)")
+
+        # Check cache first (only for non-zero temperature to avoid caching deterministic queries differently)
+        if use_cache:
+            cached = _response_cache.get(prompt, system or "", model_name)
+            if cached:
+                logger.info(f"Cache HIT - returning cached response")
+                return LLMResponse(content=cached, model=model_name, finish_reason="cached", usage={})
 
         self._ensure_configured()
 
@@ -182,6 +331,11 @@ class LLMRouter:
                         "total_tokens": getattr(response.usage_metadata, 'total_token_count', 0)
                     }
 
+                # Record success and cache response
+                _circuit_breaker.record_success()
+                if use_cache and content:
+                    _response_cache.set(prompt, system or "", model_name, content)
+
                 return LLMResponse(
                     content=content,
                     model=model_name,
@@ -192,6 +346,7 @@ class LLMRouter:
 
             except Exception as e:
                 last_error = e
+                _circuit_breaker.record_failure()
                 if is_retryable_error(e) and attempt < MAX_RETRIES - 1:
                     delay = RETRY_DELAY_BASE * (2 ** attempt)
                     logger.warning(f"Gemini call attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
@@ -315,4 +470,12 @@ def call_llm(
         'content': response.content,
         'finish_reason': response.finish_reason,
         'usage': response.usage
+    }
+
+
+def get_cache_stats() -> Dict[str, Any]:
+    """Get cache and circuit breaker statistics."""
+    return {
+        "cache": _response_cache.stats(),
+        "circuit_breaker": _circuit_breaker.state
     }

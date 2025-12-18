@@ -74,14 +74,18 @@ TRAVEL_EXPERTS = {
             "Say 'For your needs, I'd book [Hotel Name] because...' "
             "Always ask clarifying questions: 'Do you prefer direct flights or would a layover "
             "save you $200?' 'Is being near the train station important, or would you trade "
-            "location for a nicer room?' Help users make the actual booking decision."
+            "location for a nicer room?' Help users make the actual booking decision.\n\n"
+            "WHEN NO DATA IS PROVIDED: Still give actionable booking advice - which platforms "
+            "to search, when to book, price monitoring tools, and airline recommendations for this route."
         ),
         "search_queries": [
             "best flight deals destination",
             "hotel comparison reviews",
             "booking tips best time",
             "airline comparison routes",
-            "hotel booking platforms"
+            "hotel booking platforms",
+            "best time to book flights",
+            "flight price monitoring tools"
         ],
         "topics": [
             "FLIGHT ANALYSIS - When flight data is provided:",
@@ -90,13 +94,27 @@ TRAVEL_EXPERTS = {
             "  - Note airline quality, baggage policies, seat comfort",
             "  - Flag red-eye flights, long layovers, or inconvenient times",
             "  - Compare direct vs connecting flight trade-offs",
+            "WHEN NO FLIGHT DATA - Still recommend:",
+            "  - Best time to book (how many weeks/months in advance)",
+            "  - Best days to fly (Tue/Wed often cheaper)",
+            "  - Price monitoring: Google Flights alerts, Hopper app, Skyscanner",
+            "  - Which airlines fly this route (especially DIRECT flights)",
+            "AIRLINE INSIGHTS:",
+            "  - LCC vs full-service trade-offs (Peach/Jetstar vs ANA/JAL)",
+            "  - Baggage fees and seat selection costs for each airline",
+            "  - Alliance benefits (Star Alliance, oneworld, SkyTeam)",
+            "  - Airline quality ratings for this route",
             "HOTEL ANALYSIS - When hotel data is provided:",
             "  - Rank options by value (price vs location vs amenities)",
             "  - Make a SPECIFIC recommendation with reasoning",
             "  - Note walkability to attractions, transit access",
             "  - Flag any concerns (noise, dated rooms, far from center)",
-            "  - Compare different booking platforms for best price",
-            "BOOKING TIPS:",
+            "REGIONAL BOOKING PLATFORMS:",
+            "  - Asia: Agoda, Trip.com often have better deals",
+            "  - Europe: Booking.com, hotel direct sites",
+            "  - Japan: Jalan, Rakuten Travel for local rates",
+            "  - Local vs international chains comparison",
+            "BOOKING STRATEGY:",
             "  - Best time to book for this route/destination",
             "  - Flexible date strategies to save money",
             "  - Loyalty programs and credit card benefits",
@@ -187,11 +205,22 @@ TRAVEL_EXPERTS = {
             "  - TOP 3 PROVIDERS with prices",
             "  - What's included (insurance, mileage, features)",
             "  - Local vs international providers",
-            "  - Driving tips, license requirements, road rules",
+            "  - Driving requirements: IDP (International Driving Permit), local license rules",
+            "  - Japan: IDP + Japanese translation required for some countries",
             "PUBLIC TRANSPORTATION:",
-            "  - Transit passes and tourist cards",
+            "  - Transit passes and tourist cards (Suica, Oyster, T-Money, Octopus, etc.)",
+            "  - Where to buy, how to load, refund process",
             "  - Key routes and connections",
             "  - Apps and maps to download",
+            "RIDE-SHARE & TAXI APPS:",
+            "  - Regional apps: Grab (SE Asia), DiDi (China), Gojek (Indonesia), Bolt (Europe)",
+            "  - Where Uber works vs doesn't work",
+            "  - Local taxi apps and services",
+            "CONNECTIVITY & eSIM:",
+            "  - eSIM recommendations: Airalo, Holafly, Nomad by region",
+            "  - Local SIM options at airport vs pre-order",
+            "  - Pocket WiFi rental options",
+            "  - Cost comparison: eSIM vs local SIM vs roaming",
             "DAY-BY-DAY ITINERARY:",
             "  - Realistic timing with travel between spots",
             "  - Logical geographic groupings",
@@ -199,7 +228,8 @@ TRAVEL_EXPERTS = {
         ],
         "specialty_keywords": [
             "train", "bus", "car", "rental", "transport", "transit", "metro",
-            "subway", "taxi", "uber", "transfer", "airport", "station",
+            "subway", "taxi", "uber", "grab", "didi", "transfer", "airport", "station",
+            "esim", "sim", "wifi", "data", "connectivity", "suica", "oyster",
             "route", "itinerary", "schedule", "timing", "distance", "drive",
             "hertz", "avis", "europcar", "sixt", "enterprise", "license"
         ]
@@ -420,6 +450,12 @@ TRAVEL_EXPERTS = {
             "  - Best day trip destinations",
             "  - Full-day vs half-day options",
             "  - What to prioritize if time is limited",
+            "PHOTO SPOTS & VIEWPOINTS:",
+            "  - 📸 Instagram-worthy locations and best angles",
+            "  - Sunrise/sunset spots with timing recommendations",
+            "  - Hidden gems less crowded than famous spots",
+            "  - Best times of day for each location (lighting, crowds)",
+            "  - Rooftop bars/restaurants with views",
             "ENTERTAINMENT & NIGHTLIFE:",
             "  - Shows, performances, live music",
             "  - Nightlife areas and recommendations",
@@ -432,7 +468,8 @@ TRAVEL_EXPERTS = {
             "attraction", "tour", "see", "visit", "museum", "park", "beach",
             "mountain", "hike", "adventure", "show", "performance", "concert",
             "ticket", "skip-the-line", "excursion", "day trip", "nightlife",
-            "must-see", "worth it", "overrated"
+            "must-see", "worth it", "overrated", "photo", "instagram", "viewpoint",
+            "sunrise", "sunset", "scenic", "panorama"
         ]
     },
 
