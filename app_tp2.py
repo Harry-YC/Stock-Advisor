@@ -1183,17 +1183,25 @@ async def handle_plan_trip(trip_config: Dict):
                 logger.warning(f"Current events fetch failed: {e}")
                 step.output = f"Events fetch failed: {e}"
 
-    # Build user preferences context
-    user_prefs = []
+    # Build user preferences context with today's date and trip details
+    from datetime import date as date_type
+    today = date_type.today()
+    days_until_trip = (departure - today).days
+
+    user_prefs = [
+        f"- TODAY'S DATE: {today.strftime('%B %d, %Y')}",
+        f"- Trip dates: {departure.strftime('%B %d, %Y')} to {return_date.strftime('%B %d, %Y')} ({days_until_trip} days from now)",
+        f"- Destination: {destination}",
+    ]
     if origin:
-        user_prefs.append(f"- Flying from: {origin}")
+        user_prefs.append(f"- Origin/Flying from: {origin} (look for DIRECT flights first)")
     user_prefs.append(f"- Travelers: {trip_config.get('travelers', '2 adults')}")
-    user_prefs.append(f"- Budget: ${trip_config.get('budget', 5000):,}")
+    user_prefs.append(f"- Budget: ${trip_config.get('budget', 5000):,} {trip_config.get('budget_currency', 'USD')}")
     if travel_style:
         user_prefs.append(f"- Travel style: {travel_style}")
     if special_interests:
         user_prefs.append(f"- Special interests: {special_interests}")
-    user_prefs_context = "\n\n## USER PREFERENCES\n" + "\n".join(user_prefs) if user_prefs else ""
+    user_prefs_context = "\n\n## TRIP DETAILS\n" + "\n".join(user_prefs)
 
     # Run experts in parallel with progress updates
     expert_responses = {}
