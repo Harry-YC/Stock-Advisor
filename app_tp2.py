@@ -81,7 +81,10 @@ English Examples:
 - "trip from Jan 6 to Jan 9" -> {{"destination": null, "origin": null, "departure_date": "Jan 6", "return_date": "Jan 9", "travelers": null, "budget": null, "duration_days": null}}
 - "trip to Paris from Taipei budget 5000" -> {{"destination": "Paris, France", "origin": "Taipei", "departure_date": null, "return_date": null, "travelers": null, "budget": 5000, "duration_days": null}}
 - "a week in mid-January" -> {{"destination": null, "origin": null, "departure_date": "mid-January", "return_date": null, "duration_days": 7, "travelers": null, "budget": null}}
+- "two nights" or "for 2 nights" -> {{"duration_days": 3, ...}} (nights + 1 = total days)
+- "three nights" -> {{"duration_days": 4, ...}} (nights + 1 = total days)
 - "myself" or "just me" or "solo" -> {{"travelers": "1 adult (solo)"}}
+- "me and my brother" or "with my sister" -> {{"travelers": "2 adults (siblings)"}}
 - "foodie trip" -> extract "foodie" as a travel style hint, not travelers
 
 Traditional Chinese Examples (繁體中文):
