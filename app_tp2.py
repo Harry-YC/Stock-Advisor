@@ -1119,29 +1119,49 @@ async def on_message(message: cl.Message):
 # Parallel Expert Execution
 # =============================================================================
 
+# Semaphore to limit concurrent API calls (prevents rate limiting)
+_expert_semaphore = asyncio.Semaphore(2)  # Max 2 concurrent requests
+
+
 async def call_expert_async(expert_name: str, destination: str, expert_context: str) -> tuple:
     """
-    Run single expert LLM call asynchronously.
+    Run single expert LLM call asynchronously with retry logic.
 
     Returns (expert_name, response_content) tuple.
-    Uses run_in_executor to run blocking LLM call without blocking event loop.
+    Uses semaphore to limit concurrency and retries on transient failures.
     """
-    loop = asyncio.get_event_loop()
+    max_retries = 3
+    base_delay = 2  # seconds
 
-    try:
-        response = await loop.run_in_executor(
-            None,
-            lambda: call_travel_expert(
-                persona_name=expert_name,
-                clinical_question=f"Plan a trip to {destination}",
-                evidence_context=expert_context,
-                openai_api_key=settings.GEMINI_API_KEY
-            )
-        )
-        return (expert_name, response.get('content', ''))
-    except Exception as e:
-        logger.error(f"Expert {expert_name} failed: {e}")
-        return (expert_name, f"*Error: {e}*")
+    async with _expert_semaphore:  # Limit concurrent requests
+        for attempt in range(max_retries):
+            try:
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: call_travel_expert(
+                        persona_name=expert_name,
+                        clinical_question=f"Plan a trip to {destination}",
+                        evidence_context=expert_context,
+                        openai_api_key=settings.GEMINI_API_KEY
+                    )
+                )
+                return (expert_name, response.get('content', ''))
+
+            except Exception as e:
+                error_msg = str(e).lower()
+                is_retryable = any(x in error_msg for x in [
+                    'rate limit', 'timeout', 'connection', 'server',
+                    '429', '503', '502', '504', 'overloaded'
+                ])
+
+                if is_retryable and attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)  # Exponential backoff
+                    logger.warning(f"Expert {expert_name} attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"Expert {expert_name} failed after {attempt + 1} attempts: {e}")
+                    return (expert_name, f"*Error: Could not reach server. Please try again.*")
 
 
 async def handle_plan_trip(trip_config: Dict):
