@@ -1031,12 +1031,14 @@ _REQUEST_DELAY = 1.5  # Seconds between requests (helps with preview model stabi
 
 async def call_expert_async(expert_name: str, destination: str, expert_context: str) -> tuple:
     """
-    Run single expert LLM call asynchronously with retry logic.
+    Run single expert LLM call asynchronously with robust retry logic.
 
     Returns (expert_name, response_content) tuple.
     Uses semaphore to limit concurrency and retries on transient failures.
     """
-    max_retries = 3
+    import random
+
+    max_retries = 5  # Increased from 3 for better reliability
     base_delay = 2  # seconds
 
     async with _expert_semaphore:  # Limit concurrent requests
@@ -1059,18 +1061,23 @@ async def call_expert_async(expert_name: str, destination: str, expert_context: 
 
             except Exception as e:
                 error_msg = str(e).lower()
+                # Comprehensive list of retryable errors
                 is_retryable = any(x in error_msg for x in [
                     'rate limit', 'timeout', 'connection', 'server',
-                    '429', '503', '502', '504', 'overloaded'
+                    '429', '503', '502', '504', 'overloaded',
+                    'resource_exhausted', 'unavailable', 'deadline',
+                    'failed to connect', 'reset by peer', 'broken pipe',
+                    'ssl', 'eof', 'closed', 'temporarily', 'quota'
                 ])
 
                 if is_retryable and attempt < max_retries - 1:
-                    delay = base_delay * (2 ** attempt)  # Exponential backoff
-                    logger.warning(f"Expert {expert_name} attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                    # Exponential backoff with jitter to prevent thundering herd
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    logger.warning(f"Expert {expert_name} attempt {attempt + 1}/{max_retries} failed: {e}. Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
                 else:
                     logger.error(f"Expert {expert_name} failed after {attempt + 1} attempts: {e}")
-                    return (expert_name, f"*Error: Could not reach server. Please try again.*")
+                    return (expert_name, f"*Error: Could not reach server after {max_retries} attempts. Please try again.*")
 
         # Safety fallback - should never reach here but ensures explicit return
         return (expert_name, "*Error: Unexpected failure. Please try again.*")
