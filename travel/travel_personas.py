@@ -159,7 +159,7 @@ TRAVEL_EXPERTS = {
     },
 
     "Logistics Planner": {
-        "model": "gemini-3-flash-preview",  # Flash for speed
+        "model": "gemini-3-pro-preview",  # Pro for route/car rental accuracy
         "role": "Ground Transportation & Itinerary Coordinator",
         "specialty": "Routes, ground transport, car rentals, day-by-day planning, connections",
         "perspective": (
