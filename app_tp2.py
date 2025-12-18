@@ -1238,10 +1238,14 @@ async def handle_plan_trip(trip_config: Dict):
     await progress_msg.update(content="✅ **All experts ready!** Displaying results...")
 
     # Display results in order
-    for expert_name, response in results:
-        if isinstance(response, Exception):
-            logger.error(f"Expert {expert_name} failed: {response}")
-            response = f"*Error: {response}*"
+    for i, result in enumerate(results):
+        # Handle exceptions from asyncio.gather
+        if isinstance(result, Exception):
+            expert_name = selected_experts[i] if i < len(selected_experts) else f"Expert {i+1}"
+            logger.error(f"Expert {expert_name} failed: {result}")
+            response = f"*Error: Could not reach server. Please try again.*"
+        else:
+            expert_name, response = result
 
         icon = EXPERT_ICONS.get(expert_name, "🧭")
         expert_info = TRAVEL_EXPERTS.get(expert_name, {})
