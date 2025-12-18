@@ -1167,6 +1167,9 @@ async def call_expert_async(expert_name: str, destination: str, expert_context: 
                     logger.error(f"Expert {expert_name} failed after {attempt + 1} attempts: {e}")
                     return (expert_name, f"*Error: Could not reach server. Please try again.*")
 
+        # Safety fallback - should never reach here but ensures explicit return
+        return (expert_name, "*Error: Unexpected failure. Please try again.*")
+
 
 async def handle_plan_trip(trip_config: Dict):
     """Execute full trip planning with expert panel."""

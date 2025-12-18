@@ -40,8 +40,8 @@ GEMINI_BASE_URL = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googl
 # Google Places API - from Cloud Console (can be same or different key)
 GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-# API timeout
-API_TIMEOUT = int(os.getenv("API_TIMEOUT", "120"))
+# API timeout (increased for Gemini 3 preview models which can be slower)
+API_TIMEOUT = int(os.getenv("API_TIMEOUT", "180"))
 OPENAI_TIMEOUT = API_TIMEOUT  # Alias for llm_utils compatibility
 
 # =============================================================================
