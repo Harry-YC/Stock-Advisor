@@ -196,8 +196,10 @@ class LLMRouter:
         self.google_api_key = google_api_key or settings.GEMINI_API_KEY
         self.default_timeout = default_timeout
 
-        # Model assignments from settings
+        # Model assignments from settings with fallback
         self.expert_model = getattr(settings, 'EXPERT_MODEL', 'gemini-3-pro-preview')
+        self.fallback_model = getattr(settings, 'EXPERT_FALLBACK_MODEL', 'gemini-3-flash-preview')
+        self.expert_timeout = getattr(settings, 'EXPERT_TIMEOUT', 60)
 
         # Lazy-loaded client with thread-safe initialization
         self._genai_configured = False
@@ -225,10 +227,11 @@ class LLMRouter:
         system: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 4000
+        max_tokens: int = 4000,
+        use_fallback: bool = True
     ) -> LLMResponse:
         """
-        Call LLM for expert discussions.
+        Call LLM for expert discussions with automatic fallback.
 
         Args:
             prompt: The user prompt
@@ -236,12 +239,27 @@ class LLMRouter:
             model: Override model (uses expert_model from settings if not provided)
             temperature: Temperature for generation (0.0-1.0)
             max_tokens: Maximum tokens in response
+            use_fallback: If True, falls back to faster model on timeout/error
 
         Returns:
             LLMResponse with content and metadata
         """
         model_name = model or self.expert_model
-        return self._call_gemini(prompt, system, model_name, temperature, max_tokens)
+
+        try:
+            return self._call_gemini(prompt, system, model_name, temperature, max_tokens)
+        except Exception as e:
+            error_msg = str(e).lower()
+            is_timeout_or_overload = any(x in error_msg for x in [
+                'timeout', 'deadline', 'overloaded', 'resource_exhausted',
+                'unavailable', '503', '429', 'rate limit'
+            ])
+
+            # Try fallback model if primary fails with timeout/overload
+            if use_fallback and is_timeout_or_overload and model_name != self.fallback_model:
+                logger.warning(f"Primary model {model_name} failed, falling back to {self.fallback_model}")
+                return self._call_gemini(prompt, system, self.fallback_model, temperature, max_tokens)
+            raise
 
     def call_expert_stream(
         self,
@@ -249,10 +267,11 @@ class LLMRouter:
         system: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 4000
+        max_tokens: int = 4000,
+        use_fallback: bool = True
     ) -> Generator[Dict[str, Any], None, None]:
         """
-        Stream expert response for real-time display.
+        Stream expert response for real-time display with automatic fallback.
 
         Args:
             prompt: The user prompt
@@ -260,13 +279,34 @@ class LLMRouter:
             model: Override model
             temperature: Temperature
             max_tokens: Maximum tokens
+            use_fallback: If True, falls back to faster model on timeout/error
 
         Yields:
             Dict with 'type' (chunk/complete/error) and 'content'
         """
         model_name = model or self.expert_model
+        tried_fallback = False
 
         for chunk in self._call_gemini_stream(prompt, system, model_name, temperature, max_tokens):
+            # Check if we got an error that warrants fallback
+            if chunk.get("type") == "error" and use_fallback and not tried_fallback:
+                error_msg = str(chunk.get("content", "")).lower()
+                is_timeout_or_overload = any(x in error_msg for x in [
+                    'timeout', 'deadline', 'overloaded', 'resource_exhausted',
+                    'unavailable', '503', '429', 'rate limit'
+                ])
+
+                if is_timeout_or_overload and model_name != self.fallback_model:
+                    logger.warning(f"Streaming: {model_name} failed, falling back to {self.fallback_model}")
+                    tried_fallback = True
+                    yield {"type": "fallback", "content": f"Switching to faster model..."}
+                    # Retry with fallback model
+                    for fallback_chunk in self._call_gemini_stream(
+                        prompt, system, self.fallback_model, temperature, max_tokens
+                    ):
+                        yield fallback_chunk
+                    return
+
             yield chunk
 
     def _call_gemini(
@@ -312,11 +352,13 @@ class LLMRouter:
         )
 
         last_error = None
+        # Use shorter timeout for faster fallback
+        timeout = min(self.default_timeout, self.expert_timeout)
         for attempt in range(MAX_RETRIES):
             try:
                 response = model.generate_content(
                     prompt,
-                    request_options={"timeout": self.default_timeout}
+                    request_options={"timeout": timeout}
                 )
 
                 # Extract content
@@ -388,12 +430,14 @@ class LLMRouter:
         )
 
         last_error = None
+        # Use shorter timeout for faster fallback
+        timeout = min(self.default_timeout, self.expert_timeout)
         for attempt in range(MAX_RETRIES):
             try:
                 response = model.generate_content(
                     prompt,
                     stream=True,
-                    request_options={"timeout": self.default_timeout}
+                    request_options={"timeout": timeout}
                 )
 
                 full_content = ""

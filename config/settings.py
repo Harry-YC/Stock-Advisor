@@ -68,7 +68,9 @@ INITIAL_SIDEBAR_STATE = "expanded"
 # =============================================================================
 
 EXPERT_MODEL = os.getenv("EXPERT_MODEL", "gemini-3-pro-preview")
+EXPERT_FALLBACK_MODEL = os.getenv("EXPERT_FALLBACK_MODEL", "gemini-3-flash-preview")
 EXPERT_MAX_TOKENS = int(os.getenv("EXPERT_MAX_TOKENS", "6000"))
+EXPERT_TIMEOUT = int(os.getenv("EXPERT_TIMEOUT", "60"))  # Shorter timeout, then fallback
 
 # Aliases for llm_utils compatibility
 REASONING_MODEL = EXPERT_MODEL
