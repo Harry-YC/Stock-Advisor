@@ -1121,6 +1121,7 @@ async def on_message(message: cl.Message):
 
 # Semaphore to limit concurrent API calls (prevents rate limiting)
 _expert_semaphore = asyncio.Semaphore(2)  # Max 2 concurrent requests
+_REQUEST_DELAY = 1.5  # Seconds between requests (helps with preview model stability)
 
 
 async def call_expert_async(expert_name: str, destination: str, expert_context: str) -> tuple:
@@ -1134,6 +1135,9 @@ async def call_expert_async(expert_name: str, destination: str, expert_context: 
     base_delay = 2  # seconds
 
     async with _expert_semaphore:  # Limit concurrent requests
+        # Small delay between requests (helps with preview model stability)
+        await asyncio.sleep(_REQUEST_DELAY)
+
         for attempt in range(max_retries):
             try:
                 loop = asyncio.get_event_loop()
