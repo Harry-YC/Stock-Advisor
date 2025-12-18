@@ -483,7 +483,8 @@ def parse_date_range(dates_str: str, duration: int = None) -> tuple:
     if not dates_str:
         # Default to 30 days from now
         departure = date.today() + timedelta(days=30)
-        return_date = departure + timedelta(days=duration or 7)
+        # duration-1: 3-day trip = start day + 2 more days
+        return_date = departure + timedelta(days=(duration - 1) if duration else 6)
         return departure, return_date
 
     dates_str = dates_str.strip()
@@ -533,14 +534,15 @@ def parse_date_range(dates_str: str, duration: int = None) -> tuple:
         departure = date.today() + timedelta(days=30)
 
     if not return_date:
+        # duration-1: 3-day trip = start day + 2 more days
         if duration:
-            return_date = departure + timedelta(days=duration)
+            return_date = departure + timedelta(days=duration - 1)
         else:
-            return_date = departure + timedelta(days=7)
+            return_date = departure + timedelta(days=6)  # Default 7 days
 
     # Sanity check: return_date should be after departure
     if return_date <= departure:
-        return_date = departure + timedelta(days=duration or 7)
+        return_date = departure + timedelta(days=(duration - 1) if duration else 6)
 
     return departure, return_date
 
@@ -574,19 +576,20 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
         # Both dates given - use them directly
         pass
     elif departure and not return_date:
-        # Only departure, default to 7 days
-        return_date = departure + timedelta(days=duration or 7)
+        # Only departure - use duration-1 for consistency (3 days = start + 2 more days)
+        return_date = departure + timedelta(days=(duration - 1) if duration else 6)
     elif return_date and not departure:
         # Only return date, default to 7 days back
         departure = return_date - timedelta(days=(duration or 7) - 1)
     else:
         # No dates at all - default to 30 days from now
         departure = date.today() + timedelta(days=30)
-        return_date = departure + timedelta(days=duration or 7)
+        # Use duration-1 for consistency (3 days = start + 2 more days)
+        return_date = departure + timedelta(days=(duration - 1) if duration else 6)
 
     # Sanity check: return should be after departure
     if return_date <= departure:
-        return_date = departure + timedelta(days=duration or 7)
+        return_date = departure + timedelta(days=(duration - 1) if duration else 6)
 
     # Map travelers string to select value
     travelers_str = trip_info.get("travelers", "2 adults")
