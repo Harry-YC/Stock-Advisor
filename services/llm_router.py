@@ -199,15 +199,19 @@ class LLMRouter:
         # Model assignments from settings
         self.expert_model = getattr(settings, 'EXPERT_MODEL', 'gemini-3-pro-preview')
 
-        # Lazy-loaded client
+        # Lazy-loaded client with thread-safe initialization
         self._genai_configured = False
+        self._config_lock = threading.Lock()
 
     def _ensure_configured(self):
-        """Ensure Gemini SDK is configured."""
+        """Ensure Gemini SDK is configured (thread-safe)."""
+        # Double-checked locking for thread safety
         if not self._genai_configured:
-            import google.generativeai as genai
-            genai.configure(api_key=self.google_api_key)
-            self._genai_configured = True
+            with self._config_lock:
+                if not self._genai_configured:
+                    import google.generativeai as genai
+                    genai.configure(api_key=self.google_api_key)
+                    self._genai_configured = True
 
     def _get_model(self, model_name: str):
         """Get a Gemini model instance."""
@@ -420,15 +424,19 @@ class LLMRouter:
         yield {"type": "error", "content": str(last_error) if last_error else "Unknown error"}
 
 
-# Singleton instance for convenience
+# Singleton instance for convenience (thread-safe)
 _router_instance: Optional[LLMRouter] = None
+_router_lock = threading.Lock()
 
 
 def get_llm_router() -> LLMRouter:
-    """Get or create the singleton LLM Router instance."""
+    """Get or create the singleton LLM Router instance (thread-safe)."""
     global _router_instance
+    # Double-checked locking pattern for thread safety
     if _router_instance is None:
-        _router_instance = LLMRouter()
+        with _router_lock:
+            if _router_instance is None:
+                _router_instance = LLMRouter()
     return _router_instance
 
 

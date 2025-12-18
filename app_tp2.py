@@ -36,6 +36,85 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Input Validation & Sanitization
+# =============================================================================
+
+# Maximum allowed input lengths
+MAX_DESTINATION_LENGTH = 200
+MAX_MESSAGE_LENGTH = 2000
+MAX_QUESTION_LENGTH = 1000
+
+# Patterns that might indicate prompt injection attempts
+INJECTION_PATTERNS = [
+    r'ignore\s+(all\s+)?previous\s+instructions',
+    r'disregard\s+(all\s+)?above',
+    r'forget\s+(everything|all)',
+    r'you\s+are\s+now\s+a',
+    r'new\s+instructions:',
+    r'system\s*:\s*',
+    r'\[INST\]',
+    r'<\|im_start\|>',
+    r'<\|system\|>',
+]
+
+
+def sanitize_input(text: str, max_length: int = MAX_MESSAGE_LENGTH, field_name: str = "input") -> str:
+    """
+    Sanitize user input to prevent prompt injection and ensure safe processing.
+
+    Args:
+        text: Raw user input
+        max_length: Maximum allowed length
+        field_name: Name of the field for logging
+
+    Returns:
+        Sanitized text
+    """
+    if not text:
+        return ""
+
+    # Convert to string if not already
+    text = str(text).strip()
+
+    # Truncate to max length
+    if len(text) > max_length:
+        logger.warning(f"{field_name} truncated from {len(text)} to {max_length} chars")
+        text = text[:max_length]
+
+    # Check for potential injection patterns (log but don't block - could be false positives)
+    text_lower = text.lower()
+    for pattern in INJECTION_PATTERNS:
+        if re.search(pattern, text_lower):
+            logger.warning(f"Potential injection pattern detected in {field_name}: {pattern}")
+            # Don't block, but log for monitoring
+            break
+
+    # Remove control characters except newlines and tabs
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+
+    return text
+
+
+def validate_destination(destination: str) -> tuple[bool, str]:
+    """
+    Validate destination input.
+
+    Returns:
+        (is_valid, sanitized_destination or error_message)
+    """
+    if not destination:
+        return False, "Destination is required"
+
+    sanitized = sanitize_input(destination, MAX_DESTINATION_LENGTH, "destination")
+
+    # Basic validation - should contain some letters
+    if not re.search(r'[a-zA-Z]', sanitized):
+        return False, "Destination must contain location name"
+
+    return True, sanitized
+
+
+# =============================================================================
 # LLM-Guided Intake Conversation
 # =============================================================================
 
@@ -43,6 +122,9 @@ async def extract_trip_info(user_message: str, existing_info: dict) -> dict:
     """Use LLM to extract trip details from natural language."""
     from services.llm_router import get_llm_router
     router = get_llm_router()
+
+    # Sanitize user input before processing
+    user_message = sanitize_input(user_message, MAX_MESSAGE_LENGTH, "user_message")
 
     prompt = f"""Extract trip details from this user message. Return ONLY valid JSON, no markdown.
 
@@ -98,13 +180,49 @@ Return ONLY the JSON object, nothing else."""
             if chunk.get("type") == "chunk":
                 response_text += chunk.get("content", "")
 
-        # Parse JSON from response
-        # Try to find JSON in the response
-        json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
-        if json_match:
-            extracted = json.loads(json_match.group())
-        else:
+        # Parse JSON from response with multiple fallback strategies
+        extracted = None
+        parse_errors = []
+
+        # Strategy 1: Try parsing the whole response as JSON
+        try:
             extracted = json.loads(response_text.strip())
+        except json.JSONDecodeError as e:
+            parse_errors.append(f"Full parse: {e}")
+
+        # Strategy 2: Find JSON block with balanced braces (handles nested objects)
+        if extracted is None:
+            try:
+                # Find the first { and match to closing }
+                start = response_text.find('{')
+                if start != -1:
+                    depth = 0
+                    end = start
+                    for i, char in enumerate(response_text[start:], start):
+                        if char == '{':
+                            depth += 1
+                        elif char == '}':
+                            depth -= 1
+                            if depth == 0:
+                                end = i + 1
+                                break
+                    json_str = response_text[start:end]
+                    extracted = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                parse_errors.append(f"Balanced parse: {e}")
+
+        # Strategy 3: Try simple regex for flat JSON (last resort)
+        if extracted is None:
+            try:
+                json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+                if json_match:
+                    extracted = json.loads(json_match.group())
+            except json.JSONDecodeError as e:
+                parse_errors.append(f"Regex parse: {e}")
+
+        if extracted is None:
+            logger.warning(f"JSON extraction failed, all strategies exhausted: {parse_errors}")
+            return existing_info
 
         # Merge with existing info (don't overwrite with nulls)
         result = existing_info.copy()
@@ -218,7 +336,7 @@ async def show_trip_confirmation(trip_info: dict):
         return_date = date.fromisoformat(trip_config.get("return_date", ""))
         duration = (return_date - departure).days + 1
         date_str = f"{departure.strftime('%b %d')} - {return_date.strftime('%b %d, %Y')} ({duration} days)"
-    except:
+    except (ValueError, TypeError, AttributeError):
         date_str = "Dates need confirmation"
 
     # Check if we have any travel style hints
@@ -346,7 +464,7 @@ def parse_flexible_date(date_str: str, default_year: int = None) -> date:
         try:
             parsed = dateutil_parser.parse(f"{month_str} {day_str}, {year_str}")
             return parsed.date()
-        except:
+        except (ValueError, TypeError, OverflowError):
             pass
 
     # Reverse compact: "Jan6,2026"
@@ -356,7 +474,7 @@ def parse_flexible_date(date_str: str, default_year: int = None) -> date:
         try:
             parsed = dateutil_parser.parse(f"{month_str} {day_str}, {year_str}")
             return parsed.date()
-        except:
+        except (ValueError, TypeError, OverflowError):
             pass
 
     return None
@@ -1090,12 +1208,14 @@ async def call_expert_async(expert_name: str, destination: str, expert_context: 
 async def handle_plan_trip(trip_config: Dict):
     """Execute full trip planning with expert panel."""
 
-    destination = trip_config.get("destination", "").strip()
-    if not destination:
+    # Validate and sanitize destination
+    is_valid, result = validate_destination(trip_config.get("destination", ""))
+    if not is_valid:
         await cl.Message(
             content="Please set your **destination** in the settings panel first (click the gear icon)."
         ).send()
         return
+    destination = result
 
     # Parse dates
     try:
@@ -1372,6 +1492,9 @@ async def handle_car_rental_request(trip_config: Dict, trip_data: Optional[Dict]
 async def handle_expert_question(user_input: str, trip_config: Dict, trip_data: Optional[Dict]):
     """Handle direct question to a specific expert."""
 
+    # Sanitize user input
+    user_input = sanitize_input(user_input, MAX_QUESTION_LENGTH, "expert_question")
+
     # Extract expert name from input
     input_lower = user_input.lower()
     expert_name = None
@@ -1441,6 +1564,9 @@ def detect_best_expert(question: str) -> Optional[str]:
 
 async def handle_followup(question: str, trip_config: Dict, trip_data: Optional[Dict]):
     """Handle general follow-up questions by routing to the best expert."""
+
+    # Sanitize the question input
+    question = sanitize_input(question, MAX_QUESTION_LENGTH, "follow_up_question")
 
     destination = trip_config.get("destination", "")
     context = ""
