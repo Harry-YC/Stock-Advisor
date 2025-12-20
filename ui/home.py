@@ -505,18 +505,24 @@ def _render_question_input():
                 )
 
                 if uploaded_file:
-                    # Process uploaded file
-                    try:
-                        from core.document_ingestion import ingest_file
-                        with st.spinner(f"Processing {uploaded_file.name}..."):
-                            doc = ingest_file(uploaded_file, uploaded_file.name)
-                            # Store extracted text as context
-                            st.session_state.uploaded_context = doc.content[:10000]  # Limit to 10k chars
-                            st.success(f"Loaded: {uploaded_file.name} ({len(doc.content)} chars)")
-                    except ImportError:
-                        st.warning("Document ingestion not available. Paste text instead.")
-                    except Exception as e:
-                        st.error(user_friendly_error(e, "processing document"))
+                    # Validate file size (10MB limit)
+                    MAX_FILE_SIZE_MB = 10
+                    file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
+                    if file_size_mb > MAX_FILE_SIZE_MB:
+                        st.error(f"File is too large ({file_size_mb:.1f}MB). Maximum allowed size is {MAX_FILE_SIZE_MB}MB.")
+                    else:
+                        # Process uploaded file
+                        try:
+                            from core.document_ingestion import ingest_file
+                            with st.spinner(f"Processing {uploaded_file.name}..."):
+                                doc = ingest_file(uploaded_file, uploaded_file.name)
+                                # Store extracted text as context
+                                st.session_state.uploaded_context = doc.content[:10000]  # Limit to 10k chars
+                                st.success(f"Loaded: {uploaded_file.name} ({len(doc.content)} chars)")
+                        except ImportError:
+                            st.warning("Document ingestion not available. Paste text instead.")
+                        except Exception as e:
+                            st.error(user_friendly_error(e, "processing document"))
 
             with context_tab3:
                 url_input = st.text_input(
@@ -558,29 +564,42 @@ def _render_question_input():
                 )
 
                 if uploaded_images:
-                    # Show thumbnails
-                    cols = st.columns(min(len(uploaded_images), 3))
-                    for i, img in enumerate(uploaded_images):
-                        with cols[i % 3]:
-                            st.image(img, width=150)
+                    # Validate image sizes (5MB per image limit)
+                    MAX_IMAGE_SIZE_MB = 5
+                    valid_images = []
+                    for img in uploaded_images:
+                        img.seek(0)
+                        img_size_mb = len(img.read()) / (1024 * 1024)
+                        img.seek(0)  # Reset for later use
+                        if img_size_mb > MAX_IMAGE_SIZE_MB:
+                            st.warning(f"Image '{img.name}' is too large ({img_size_mb:.1f}MB). Max: {MAX_IMAGE_SIZE_MB}MB - skipped.")
+                        else:
+                            valid_images.append(img)
 
-                    # Analyze button
-                    if st.button("🔬 Analyze Images", key="analyze_images_btn"):
-                        try:
-                            from core.image_analyzer import analyze_image, format_for_expert_context
-                            with st.spinner("Analyzing images..."):
-                                analyses = []
-                                for img in uploaded_images:
-                                    # store pointer to beginning to read bytes
-                                    img.seek(0)
-                                    result = analyze_image(img.read(), img.name)
-                                    analyses.append(result)
+                    if valid_images:
+                        # Show thumbnails
+                        cols = st.columns(min(len(valid_images), 3))
+                        for i, img in enumerate(valid_images):
+                            with cols[i % 3]:
+                                st.image(img, width=150)
 
-                                st.session_state.image_analyses = analyses
-                                st.session_state.image_context = format_for_expert_context(analyses)
-                                st.success(f"Analyzed {len(analyses)} image(s)")
-                        except Exception as e:
-                            st.error(user_friendly_error(e, "analyzing images"))
+                        # Analyze button
+                        if st.button("🔬 Analyze Images", key="analyze_images_btn"):
+                            try:
+                                from core.image_analyzer import analyze_image, format_for_expert_context
+                                with st.spinner("Analyzing images..."):
+                                    analyses = []
+                                    for img in valid_images:
+                                        # store pointer to beginning to read bytes
+                                        img.seek(0)
+                                        result = analyze_image(img.read(), img.name)
+                                        analyses.append(result)
+
+                                    st.session_state.image_analyses = analyses
+                                    st.session_state.image_context = format_for_expert_context(analyses)
+                                    st.success(f"Analyzed {len(analyses)} image(s)")
+                            except Exception as e:
+                                st.error(user_friendly_error(e, "analyzing images"))
 
         # Combine context from all sources
         context_text_val = st.session_state.get('home_context_input', '')

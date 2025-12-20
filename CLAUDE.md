@@ -46,11 +46,12 @@ chainlit run app_tp2.py -w
 
 ```
 Travel Planner/
-├── app_tp2.py                    # Main Chainlit app (~950 lines)
+├── app_tp2.py                    # Main Chainlit app (~1500 lines)
 ├── chainlit.md                   # Welcome message
 ├── Procfile                      # Railway/Heroku deployment
 ├── railway.toml                  # Railway configuration
 ├── requirements.txt              # Python dependencies
+├── pytest.ini                    # Test configuration
 │
 ├── config/
 │   └── settings.py               # Centralized configuration
@@ -65,16 +66,29 @@ Travel Planner/
 │   ├── amadeus_flights.py        # Flight search
 │   ├── amadeus_cars.py           # Car rental search
 │   ├── google_search.py          # Google Search + Maps grounding
-│   └── google_places.py          # Places ratings (filters closed)
+│   └── google_places.py          # Places ratings (thread-safe cache)
 │
 ├── services/
 │   ├── llm_router.py             # Gemini API routing
-│   ├── travel_data_service.py    # Data aggregation + search triggers
+│   ├── travel_data_service.py    # Data aggregation + prompt sanitization
+│   ├── place_enrichment_service.py # Google Places trust scoring
 │   ├── excel_export_service.py   # Professional Excel export
 │   └── word_export_service.py    # Word document export
 │
-└── travel/
-    └── travel_personas.py        # 8 Expert definitions + presets
+├── tests/
+│   ├── conftest.py               # Pytest fixtures
+│   ├── run_tests.py              # Test runner script
+│   ├── test_file_upload_validation.py
+│   ├── test_excel_traveler_extraction.py
+│   ├── test_security.py
+│   ├── test_places_enrichment.py
+│   └── README.md                 # Test documentation
+│
+├── travel/
+│   └── travel_personas.py        # 8 Expert definitions + presets
+│
+└── ui/
+    └── home.py                   # Streamlit UI components
 ```
 
 ## Environment Variables
@@ -160,6 +174,58 @@ railway up
 | Amadeus | 2,000 calls/month | Contact for pricing |
 | Google Places | $200/month credit | $0.032/search |
 
+## Testing
+
+### Quick Test Commands
+
+```bash
+# Run all unit tests
+python3 tests/run_tests.py
+
+# Run specific test file
+python3 -m pytest tests/test_security.py -v
+
+# Run with coverage
+python3 tests/run_tests.py --coverage
+
+# Run E2E tests (requires running server)
+python3 tests/run_tests.py --e2e
+```
+
+### Test Coverage
+
+| Test File | Tests | Features Covered |
+|-----------|-------|------------------|
+| `test_file_upload_validation.py` | 9 | 10MB doc limit, 5MB image limit |
+| `test_excel_traveler_extraction.py` | 12 | "Group (4+)" regex, parser |
+| `test_security.py` | 14 | Prompt injection, exception sanitization |
+| `test_places_enrichment.py` | 30 | Trust scoring, place extraction |
+
+See `tests/README.md` for full documentation.
+
+## Security Features
+
+### Prompt Injection Protection
+- `_sanitize_for_prompt()` in `travel_data_service.py`
+- Blocks "ignore previous instructions" patterns
+- Limits input to 200 characters
+- Removes special characters
+
+### Exception Sanitization
+- User-facing errors are generic ("Please try again")
+- Full stack traces logged server-side with `exc_info=True`
+- No file paths or internal details exposed
+
+### Thread-Safe Caching
+- `GooglePlacesClient` uses `threading.RLock()`
+- All cache operations protected
+- Safe for concurrent requests
+
+### File Upload Limits
+- Documents: 10MB maximum
+- Images: 5MB per image maximum
+- Validated before processing
+
 ## Recent Updates (Dec 2025)
 
 1. **Google Search grounding** for Safety Expert
@@ -169,6 +235,9 @@ railway up
 5. **Conversational intake** flow
 6. **Expert follow-up suggestions**
 7. **Professional Excel export** with 8 sheets
+8. **Google Places auto-enrichment** for expert responses
+9. **Security hardening** - prompt injection protection, exception sanitization
+10. **Comprehensive test suite** with 65+ tests
 
 ## Troubleshooting
 

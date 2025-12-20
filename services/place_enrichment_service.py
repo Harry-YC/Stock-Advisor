@@ -344,8 +344,9 @@ class PlaceEnrichmentService:
         expert_place_map = {
             "Accommodation Specialist": ("hotels", "lodging"),
             "Food & Dining Expert": ("restaurants", "restaurant"),
-            "Activity Planner": ("activities", "tourist_attraction"),
-            "Local Guide": ("activities", "tourist_attraction"),
+            "Activity Curator": ("activities", "tourist_attraction"),
+            "Local Culture Guide": ("activities", "tourist_attraction"),
+            "Booking Specialist": ("hotels", "lodging"),
         }
 
         # Extract and enrich places
@@ -368,6 +369,34 @@ class PlaceEnrichmentService:
 
         result[category] = enriched
         return result
+
+    def format_enrichment_section(self, enriched_results: Dict[str, List[EnrichedPlace]]) -> str:
+        """
+        Format all enriched places into a markdown section for appending to expert response.
+
+        Args:
+            enriched_results: Dict from enrich_expert_response with hotels, restaurants, activities
+
+        Returns:
+            Formatted markdown string or empty string if no places found
+        """
+        all_places = []
+        for category in ["restaurants", "hotels", "activities"]:
+            all_places.extend(enriched_results.get(category, []))
+
+        if not all_places:
+            return ""
+
+        # Filter to only places that were found (not NOT_FOUND)
+        found_places = [p for p in all_places if p.trust_score != "NOT_FOUND"]
+
+        if not found_places:
+            return ""
+
+        header = "\n\n---\n\n### 📍 Google Places Ratings\n\n"
+        content = self.format_enriched_places(found_places)
+
+        return header + content
 
 
 # Convenience function for quick lookups

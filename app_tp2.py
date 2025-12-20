@@ -245,8 +245,7 @@ def get_next_question(trip_info: dict) -> Optional[str]:
         return "When are you thinking of traveling? 📅"
     if not trip_info.get("travelers"):
         return "Who's joining you on this trip? 👥"
-    if not trip_info.get("budget"):
-        return "What's your approximate budget for this trip? 💰"
+    # Budget is no longer required - will be auto-estimated for top 15% travelers
     return None  # All essentials collected!
 
 
@@ -634,14 +633,58 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
         travelers = "2 adults"
 
     # Handle budget and currency
-    budget = trip_info.get("budget", 5000)
-    budget_currency = trip_info.get("budget_currency", "USD")
+    budget_source = "user_provided"
+    estimation_details = None
 
-    # If no currency specified and budget > 10000, likely TWD (common for Taiwan users)
-    if not trip_info.get("budget_currency") and budget and budget > 10000:
-        # Heuristic: budgets over 10000 without currency specified might be TWD
-        # But we'll default to USD and let the user correct if needed
-        budget_currency = "USD"
+    if trip_info.get("budget"):
+        # User provided a budget
+        budget = trip_info.get("budget")
+        budget_currency = trip_info.get("budget_currency", "USD")
+
+        # If no currency specified and budget > 10000, likely TWD (common for Taiwan users)
+        if not trip_info.get("budget_currency") and budget and budget > 10000:
+            # Heuristic: budgets over 10000 without currency specified might be TWD
+            # But we'll default to USD and let the user correct if needed
+            budget_currency = "USD"
+    else:
+        # Auto-estimate budget for top 15% travelers using Gemini-3-pro-preview
+        try:
+            from services.budget_estimation_service import BudgetEstimationService
+
+            # Parse number of travelers from travelers string
+            num_travelers = 2  # default
+            if travelers == "1 adult":
+                num_travelers = 1
+            elif travelers == "2 adults":
+                num_travelers = 2
+            elif travelers == "2 adults + 1 child":
+                num_travelers = 3
+            elif travelers == "2 adults + 2 children":
+                num_travelers = 4
+            elif travelers == "Group (4+)":
+                num_travelers = 5
+
+            estimator = BudgetEstimationService()
+            estimation = estimator.estimate_top_15_percent_budget(
+                destination=trip_info.get("destination", ""),
+                origin=trip_info.get("origin"),
+                departure_date=departure,
+                return_date=return_date,
+                num_travelers=num_travelers,
+                travel_interests=trip_info.get("special_interests", "").split(",") if trip_info.get("special_interests") else None
+            )
+
+            budget = estimation["total_budget"]
+            budget_currency = estimation.get("currency", "USD")
+            budget_source = "estimated"
+            estimation_details = estimation
+            logger.info(f"Auto-estimated budget: ${budget:,} USD for top 15% travelers")
+
+        except Exception as e:
+            logger.error(f"Budget estimation failed, using default: {e}")
+            budget = 5000
+            budget_currency = "USD"
+            budget_source = "default"
 
     return {
         "destination": trip_info.get("destination", ""),
@@ -651,6 +694,8 @@ def convert_trip_info_to_config(trip_info: dict) -> dict:
         "travelers": travelers,
         "budget": budget,
         "budget_currency": budget_currency,
+        "_budget_source": budget_source,
+        "_estimation_details": estimation_details,
         "preset": "Quick Trip Planning",
         "travel_style": trip_info.get("travel_style", ""),
         "special_interests": trip_info.get("special_interests", ""),
@@ -751,8 +796,8 @@ async def on_export_excel(action: cl.Action):
         ).send()
 
     except Exception as e:
-        logger.error(f"Excel export failed: {e}")
-        await cl.Message(content=f"Sorry, I couldn't generate the Excel file: {e}").send()
+        logger.error(f"Excel export failed: {e}", exc_info=True)
+        await cl.Message(content="Sorry, I couldn't generate the Excel file. Please try again or contact support if the issue persists.").send()
 
 
 @cl.action_callback("export_word")
@@ -788,8 +833,8 @@ async def on_export_word(action: cl.Action):
         ).send()
 
     except Exception as e:
-        logger.error(f"Word export failed: {e}")
-        await cl.Message(content=f"Sorry, I couldn't generate the Word file: {e}").send()
+        logger.error(f"Word export failed: {e}", exc_info=True)
+        await cl.Message(content="Sorry, I couldn't generate the Word file. Please try again or contact support if the issue persists.").send()
 
 
 # =============================================================================
@@ -996,6 +1041,10 @@ async def handle_file_upload(message: cl.Message):
     """Handle uploaded files - extract content and offer to revise travel plans."""
     from core.utils import extract_text_from_file
     from services.llm_router import get_llm_router
+    import os
+
+    # File size limit: 10MB
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
 
     supported_types = {
         'application/pdf': 'PDF',
@@ -1005,6 +1054,19 @@ async def handle_file_upload(message: cl.Message):
     }
 
     for element in message.elements:
+        # Validate file size before processing
+        try:
+            if element.path and os.path.exists(element.path):
+                file_size = os.path.getsize(element.path)
+                if file_size > MAX_FILE_SIZE:
+                    size_mb = file_size / (1024 * 1024)
+                    await cl.Message(
+                        content=f"File **{element.name}** is too large ({size_mb:.1f}MB). Maximum allowed size is 10MB."
+                    ).send()
+                    continue
+        except OSError as e:
+            logger.warning(f"Could not check file size for {element.name}: {e}")
+            # Continue anyway - let the file processing handle any issues
         # Check if file type is supported
         file_type = None
         for mime, name in supported_types.items():
@@ -1084,6 +1146,69 @@ Be concise - just extract the key points."""
         await cl.Message(content=response).send()
 
 
+async def handle_budget_adjustment(user_input: str, trip_config: Dict) -> bool:
+    """
+    Handle budget adjustment requests from user.
+
+    Returns True if this was a budget adjustment request, False otherwise.
+    """
+    import re
+
+    user_input_lower = user_input.lower().strip()
+
+    # Check for budget-related keywords
+    if not any(word in user_input_lower for word in ["budget", "spending", "spend"]):
+        return False
+
+    current_budget = trip_config.get("budget", 5000)
+    budget_currency = trip_config.get("budget_currency", "USD")
+
+    # Pattern 1: "set budget to $X" or "budget of $X" or "change budget to X"
+    amount_match = re.search(r'(?:set|change|make|use|budget\s+(?:of|to|is|should be)?)\s*\$?([\d,]+)', user_input_lower)
+    if amount_match:
+        new_budget = int(amount_match.group(1).replace(",", ""))
+        trip_config["budget"] = new_budget
+        trip_config["_budget_source"] = "user_adjusted"
+        cl.user_session.set("trip_config", trip_config)
+
+        await cl.Message(
+            content=f"✅ Budget updated to **${new_budget:,} {budget_currency}**.\n\n"
+                    f"Would you like me to re-run the expert panel with this new budget? Just say \"plan my trip\" to refresh recommendations."
+        ).send()
+        return True
+
+    # Pattern 2: "increase budget" or "more budget" or "higher budget"
+    if any(word in user_input_lower for word in ["increase", "raise", "higher", "more", "bigger"]):
+        # Increase by 25%
+        new_budget = int(current_budget * 1.25)
+        trip_config["budget"] = new_budget
+        trip_config["_budget_source"] = "user_adjusted"
+        cl.user_session.set("trip_config", trip_config)
+
+        await cl.Message(
+            content=f"✅ Budget increased by 25% to **${new_budget:,} {budget_currency}** (was ${current_budget:,}).\n\n"
+                    f"Would you like me to re-run the expert panel? Just say \"plan my trip\" to get updated recommendations."
+        ).send()
+        return True
+
+    # Pattern 3: "decrease budget" or "less budget" or "lower budget"
+    if any(word in user_input_lower for word in ["decrease", "reduce", "lower", "less", "smaller", "cut"]):
+        # Decrease by 25%
+        new_budget = int(current_budget * 0.75)
+        trip_config["budget"] = new_budget
+        trip_config["_budget_source"] = "user_adjusted"
+        cl.user_session.set("trip_config", trip_config)
+
+        await cl.Message(
+            content=f"✅ Budget decreased by 25% to **${new_budget:,} {budget_currency}** (was ${current_budget:,}).\n\n"
+                    f"Would you like me to re-run the expert panel? Just say \"plan my trip\" to get updated recommendations."
+        ).send()
+        return True
+
+    # Not a recognized budget adjustment pattern
+    return False
+
+
 @cl.on_message
 async def on_message(message: cl.Message):
     """Handle user messages."""
@@ -1131,6 +1256,10 @@ async def on_message(message: cl.Message):
     # Check for on-demand car rental request (only after trip is planned)
     if "car" in user_input and ("rental" in user_input or "rent" in user_input):
         await handle_car_rental_request(trip_config, trip_data)
+        return
+
+    # Check for budget adjustment request
+    if await handle_budget_adjustment(message.content, trip_config):
         return
 
     # Check for specific expert request
@@ -1203,6 +1332,63 @@ async def call_expert_async(expert_name: str, destination: str, expert_context: 
 
         # Safety fallback - should never reach here but ensures explicit return
         return (expert_name, "*Error: Unexpected failure. Please try again.*")
+
+
+async def enrich_expert_response_async(
+    msg: cl.Message,
+    response: str,
+    expert_name: str,
+    destination: str
+) -> None:
+    """
+    Enrich an expert response with Google Places data and update the message.
+
+    Runs in background - does not block main flow. Adds ratings, reviews, and
+    trust badges for places mentioned in the expert's response.
+    """
+    from services.place_enrichment_service import PlaceEnrichmentService
+
+    # Only certain experts should trigger enrichment
+    enrichable_experts = {
+        "Food & Dining Expert",
+        "Accommodation Specialist",
+        "Activity Curator",
+        "Local Culture Guide",
+        "Booking Specialist",
+    }
+
+    if expert_name not in enrichable_experts:
+        return
+
+    try:
+        service = PlaceEnrichmentService()
+
+        # Check if service is available (API key configured)
+        if not service.is_available():
+            return
+
+        # Run enrichment in executor to not block event loop
+        loop = asyncio.get_event_loop()
+        enriched = await loop.run_in_executor(
+            None,
+            lambda: service.enrich_expert_response(
+                response_text=response,
+                destination=destination,
+                expert_type=expert_name
+            )
+        )
+
+        # Format enrichment section
+        enrichment_section = service.format_enrichment_section(enriched)
+
+        if enrichment_section:
+            # Update the message with enriched content
+            msg.content = msg.content + enrichment_section
+            await msg.update()
+
+    except Exception as e:
+        # Silently fail - enrichment is optional enhancement
+        logger.warning(f"Place enrichment failed for {expert_name}: {e}")
 
 
 async def handle_plan_trip(trip_config: Dict):
@@ -1357,9 +1543,8 @@ async def handle_plan_trip(trip_config: Dict):
         status = " | ".join(done)
         if pending:
             status += "\n\nWaiting: " + ", ".join(pending)
-        await progress_msg.update(
-            content=f"🔄 **Consulting experts...**\n\n{status}"
-        )
+        progress_msg.content = f"🔄 **Consulting experts...**\n\n{status}"
+        await progress_msg.update()
         return result
 
     # Build tasks for all experts
@@ -1374,9 +1559,12 @@ async def handle_plan_trip(trip_config: Dict):
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Update progress to show all done
-    await progress_msg.update(content="✅ **All experts ready!** Displaying results...")
+    progress_msg.content = "✅ **All experts ready!** Displaying results..."
+    await progress_msg.update()
 
-    # Display results in order
+    # Display results in order and start background enrichment
+    enrichment_tasks = []
+
     for i, result in enumerate(results):
         # Handle exceptions from asyncio.gather
         if isinstance(result, Exception):
@@ -1391,8 +1579,23 @@ async def handle_plan_trip(trip_config: Dict):
         role = expert_info.get("role", expert_name)
 
         content = f"## {icon} {expert_name}\n*{role}*\n\n{response}"
-        await cl.Message(content=content, author=f"{icon} {expert_name}").send()
+        msg = await cl.Message(content=content, author=f"{icon} {expert_name}").send()
         expert_responses[expert_name] = response
+
+        # Start background enrichment with Google Places (non-blocking)
+        enrichment_task = asyncio.create_task(
+            enrich_expert_response_async(
+                msg=msg,
+                response=response,
+                expert_name=expert_name,
+                destination=destination
+            )
+        )
+        enrichment_tasks.append(enrichment_task)
+
+    # Wait for all enrichment tasks to complete before showing summary
+    if enrichment_tasks:
+        await asyncio.gather(*enrichment_tasks, return_exceptions=True)
 
     # Store responses
     cl.user_session.set("expert_responses", expert_responses)
@@ -1408,6 +1611,33 @@ async def handle_plan_trip(trip_config: Dict):
                 "*Need a rental car? Just say \"show car rentals\"!*",
         actions=export_actions
     ).send()
+
+    # Show budget note if budget was auto-estimated
+    if trip_config.get("_budget_source") == "estimated":
+        budget = trip_config.get("budget", 0)
+        budget_currency = trip_config.get("budget_currency", "USD")
+        estimation_details = trip_config.get("_estimation_details", {})
+        breakdown = estimation_details.get("breakdown", {})
+
+        # Format breakdown if available
+        breakdown_parts = []
+        if breakdown.get("flights"):
+            breakdown_parts.append(f"Flights ${breakdown['flights']:,}")
+        if breakdown.get("accommodation"):
+            breakdown_parts.append(f"Hotels ${breakdown['accommodation']:,}")
+        if breakdown.get("food"):
+            breakdown_parts.append(f"Food ${breakdown['food']:,}")
+        if breakdown.get("activities"):
+            breakdown_parts.append(f"Activities ${breakdown['activities']:,}")
+
+        breakdown_str = " | ".join(breakdown_parts) if breakdown_parts else ""
+        breakdown_line = f"\n> *Breakdown: {breakdown_str}*" if breakdown_str else ""
+
+        await cl.Message(
+            content=f"> 💰 **Budget Note:** This plan is based on an estimated budget of "
+                    f"**${budget:,} {budget_currency}** (top 15% traveler spending). "
+                    f"You can adjust your budget anytime - just let me know!{breakdown_line}"
+        ).send()
 
     # Suggest other experts not in the current panel
     all_experts = list(TRAVEL_EXPERTS.keys())

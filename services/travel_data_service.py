@@ -14,10 +14,42 @@ Data Sources:
 from typing import Dict, Optional
 from datetime import date, timedelta
 import logging
+import re
 
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_for_prompt(text: str, max_length: int = 200) -> str:
+    """
+    Sanitize user input for safe interpolation into LLM prompts.
+
+    Removes potential injection patterns and limits length.
+    """
+    if not text:
+        return ""
+
+    # Truncate to reasonable length
+    text = str(text).strip()[:max_length]
+
+    # Remove characters that could be used for prompt manipulation
+    # Allow: letters, numbers, spaces, commas, periods, hyphens, apostrophes
+    text = re.sub(r'[^a-zA-Z0-9\s,.\-\'àáâãäåèéêëìíîïòóôõöùúûüýÿñçøåæœ]', '', text)
+
+    # Remove potential injection phrases
+    injection_patterns = [
+        r'ignore\s+(all\s+)?previous',
+        r'disregard\s+(all\s+)?above',
+        r'forget\s+(everything|all)',
+        r'you\s+are\s+now',
+        r'new\s+instructions',
+        r'system\s*:',
+    ]
+    for pattern in injection_patterns:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+    return text.strip()
 
 
 class TravelDataService:
@@ -64,6 +96,11 @@ class TravelDataService:
         Returns:
             Dict with keys: 'weather', 'flights', 'car_rentals', 'hotels', 'dining', 'summary'
         """
+        # Sanitize inputs for safe prompt interpolation
+        destination = _sanitize_for_prompt(destination)
+        origin = _sanitize_for_prompt(origin) if origin else None
+        travelers = _sanitize_for_prompt(travelers, max_length=100)
+
         results = {
             "weather": "",
             "flights": "",
@@ -371,6 +408,9 @@ Focus on highly-rated restaurants (4.0+) with authentic local experiences."""
         Returns:
             Formatted string with advisory information, or empty string if unavailable.
         """
+        # Sanitize input for safe prompt interpolation
+        destination = _sanitize_for_prompt(destination)
+
         try:
             from integrations.google_search import search_with_grounding
         except ImportError:
@@ -425,6 +465,9 @@ Include source names but not full URLs. Be concise."""
         Returns:
             Formatted string with event information.
         """
+        # Sanitize input for safe prompt interpolation
+        destination = _sanitize_for_prompt(destination)
+
         try:
             from integrations.google_search import search_with_grounding
         except ImportError:

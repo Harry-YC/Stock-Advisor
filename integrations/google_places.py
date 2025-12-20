@@ -9,6 +9,7 @@ Cost-efficient client with:
 
 import requests
 import logging
+import threading
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
@@ -105,6 +106,7 @@ class GooglePlacesClient:
 
     # Class-level cache shared across instances
     _cache: Dict[str, tuple] = {}
+    _cache_lock = threading.RLock()  # Thread-safe lock for cache operations
     CACHE_TTL = timedelta(hours=24)
 
     def __init__(self, api_key: Optional[str] = None):
@@ -120,19 +122,21 @@ class GooglePlacesClient:
         return hashlib.md5(raw.encode()).hexdigest()
 
     def _get_cached(self, key: str) -> Optional[Any]:
-        """Get from cache if not expired."""
-        if key in self._cache:
-            result, timestamp = self._cache[key]
-            if datetime.now() - timestamp < self.CACHE_TTL:
-                logger.debug(f"Cache hit: {key[:8]}...")
-                return result
-            else:
-                del self._cache[key]
-        return None
+        """Get from cache if not expired (thread-safe)."""
+        with self._cache_lock:
+            if key in self._cache:
+                result, timestamp = self._cache[key]
+                if datetime.now() - timestamp < self.CACHE_TTL:
+                    logger.debug(f"Cache hit: {key[:8]}...")
+                    return result
+                else:
+                    del self._cache[key]
+            return None
 
     def _set_cached(self, key: str, result: Any):
-        """Store in cache with timestamp."""
-        self._cache[key] = (result, datetime.now())
+        """Store in cache with timestamp (thread-safe)."""
+        with self._cache_lock:
+            self._cache[key] = (result, datetime.now())
 
     def search_places(
         self,
@@ -355,16 +359,18 @@ class GooglePlacesClient:
         return " ".join(parts)
 
     def clear_cache(self):
-        """Clear the entire cache (useful for testing)."""
-        self._cache.clear()
+        """Clear the entire cache (thread-safe, useful for testing)."""
+        with self._cache_lock:
+            self._cache.clear()
         logger.info("Places cache cleared")
 
     def get_cache_stats(self) -> Dict[str, int]:
-        """Get cache statistics."""
-        now = datetime.now()
-        valid = sum(1 for _, (_, ts) in self._cache.items() if now - ts < self.CACHE_TTL)
-        return {
-            "total_entries": len(self._cache),
-            "valid_entries": valid,
-            "expired_entries": len(self._cache) - valid
-        }
+        """Get cache statistics (thread-safe)."""
+        with self._cache_lock:
+            now = datetime.now()
+            valid = sum(1 for _, (_, ts) in self._cache.items() if now - ts < self.CACHE_TTL)
+            return {
+                "total_entries": len(self._cache),
+                "valid_entries": valid,
+                "expired_entries": len(self._cache) - valid
+            }

@@ -186,8 +186,8 @@ class GoogleSearchClient:
                     content_text = response.text
                 except ValueError:
                     # Fallback for safety blocked responses
-                     if candidate.finish_reason != 1: # STOP
-                         content_text = f"[Response Blocked: {candidate.finish_reason}]"
+                    if candidate.finish_reason != 1:  # STOP
+                        content_text = f"[Response Blocked: {candidate.finish_reason}]"
 
                 if hasattr(candidate, 'grounding_metadata'):
                     metadata = candidate.grounding_metadata
@@ -198,7 +198,7 @@ class GoogleSearchClient:
                             search_queries = [metadata.search_entry_point.rendered_content]
 
                     # Extract web sources
-                    if hasattr(metadata, 'grounding_chunks'):
+                    if hasattr(metadata, 'grounding_chunks') and metadata.grounding_chunks:
                         for chunk in metadata.grounding_chunks:
                             if hasattr(chunk, 'web'):
                                 sources.append(GroundingSource(
@@ -208,7 +208,7 @@ class GoogleSearchClient:
                                 ))
 
                     # Extract segment→source mappings for inline citations
-                    if hasattr(metadata, 'grounding_supports'):
+                    if hasattr(metadata, 'grounding_supports') and metadata.grounding_supports:
                         for support in metadata.grounding_supports:
                              # Convert repeated scalar fields to lists
                             indices = []
@@ -464,7 +464,7 @@ class TravelGroundingClient:
                     metadata = candidate.grounding_metadata
 
                     # Web sources from Search grounding
-                    if hasattr(metadata, 'grounding_chunks'):
+                    if hasattr(metadata, 'grounding_chunks') and metadata.grounding_chunks:
                         for chunk in metadata.grounding_chunks:
                             if hasattr(chunk, 'web'):
                                 sources.append(GroundingSource(
@@ -474,7 +474,7 @@ class TravelGroundingClient:
                                 ))
 
                     # Places data from Maps grounding
-                    if hasattr(metadata, 'grounding_supports'):
+                    if hasattr(metadata, 'grounding_supports') and metadata.grounding_supports:
                         for support in metadata.grounding_supports:
                             if hasattr(support, 'segment'):
                                 places.append({

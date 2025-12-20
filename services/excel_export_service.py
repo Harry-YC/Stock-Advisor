@@ -271,7 +271,9 @@ class TravelPlanParser:
 
         # Extract travelers - English and Chinese
         travelers_patterns = [
-            r"(\d+)\s*(?:people|person|travelers|adults|人)",
+            r"Group\s*\((\d+)\+?\)",  # "Group (4+)" or "Group (4)"
+            r"(\d+)\s*(?:people|person|travelers|travellers|adults|guests|人)",
+            r"(\d+)\s+adults",  # "2 adults"
             r"([一二三四五六七八九十]+)\s*(?:人|個人|位)",
         ]
         for pattern in travelers_patterns:
