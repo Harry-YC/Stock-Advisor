@@ -83,6 +83,25 @@ def validate_ticker(ticker: str) -> tuple[bool, str]:
     return True, ticker
 
 
+def extract_advisory_summary(response: str) -> str:
+    """Extract advisory summary fields from expert response."""
+    labels = [
+        "Recommendation",
+        "Time Horizon",
+        "Timing Guidance",
+        "Confidence",
+        "Key Reasons",
+        "Key Risks",
+    ]
+    summary_lines = []
+    for label in labels:
+        pattern = rf"^{label}\s*:\s*(.+)$"
+        match = re.search(pattern, response, re.IGNORECASE | re.MULTILINE)
+        if match:
+            summary_lines.append(f"**{label}:** {match.group(1).strip()}")
+    return "\n".join(summary_lines)
+
+
 # =============================================================================
 # Stock Analysis Functions
 # =============================================================================
@@ -222,8 +241,10 @@ async def display_expert_responses(responses: Dict[str, str], question: str):
     """Display expert responses with formatting."""
     for expert_name, response in responses.items():
         icon = EXPERT_ICONS.get(expert_name, "📊")
+        advisory_summary = extract_advisory_summary(response)
+        advisory_block = f"> {advisory_summary}\n\n" if advisory_summary else ""
         await cl.Message(
-            content=f"## {icon} {expert_name}\n\n{response}"
+            content=f"## {icon} {expert_name}\n\n{advisory_block}{response}"
         ).send()
 
     # Store responses for follow-up
@@ -234,6 +255,8 @@ async def display_expert_responses(responses: Dict[str, str], question: str):
     actions = [
         cl.Action(name="ask_followup", label="💬 Ask Follow-up", value="followup", payload={}),
         cl.Action(name="deep_dive", label="🔍 Deep Dive", value="deep", payload={}),
+        cl.Action(name="advisory_buy", label="🟢 Should I buy?", value="buy", payload={}),
+        cl.Action(name="advisory_sell", label="🔴 Should I sell?", value="sell", payload={}),
     ]
     await cl.Message(
         content="---\n*Ask a follow-up question or request a deep dive analysis.*",
@@ -430,6 +453,46 @@ async def on_quick_analysis(action: cl.Action):
     await display_expert_responses(responses, f"Quick analysis of {ticker}")
 
 
+@cl.action_callback("advisory_buy")
+async def on_advisory_buy(action: cl.Action):
+    """Provide buy-focused advisory guidance."""
+    tickers = cl.user_session.get("detected_tickers", [])
+    if not tickers:
+        await cl.Message(content="Please specify a stock symbol for buy guidance.").send()
+        return
+    ticker = tickers[0]
+    question = (
+        f"Should I buy {ticker}? Provide a Buy/Sell/Hold recommendation with timing guidance, "
+        "confidence level, key reasons, and key risks."
+    )
+    responses = await run_expert_panel(
+        question=question,
+        tickers=[ticker],
+        preset="Trade Planning"
+    )
+    await display_expert_responses(responses, question)
+
+
+@cl.action_callback("advisory_sell")
+async def on_advisory_sell(action: cl.Action):
+    """Provide sell-focused advisory guidance."""
+    tickers = cl.user_session.get("detected_tickers", [])
+    if not tickers:
+        await cl.Message(content="Please specify a stock symbol for sell guidance.").send()
+        return
+    ticker = tickers[0]
+    question = (
+        f"Should I sell {ticker}? Provide a Buy/Sell/Hold recommendation with timing guidance, "
+        "confidence level, key reasons, and key risks."
+    )
+    responses = await run_expert_panel(
+        question=question,
+        tickers=[ticker],
+        preset="Trade Planning"
+    )
+    await display_expert_responses(responses, question)
+
+
 # =============================================================================
 # Main Handlers
 # =============================================================================
@@ -494,9 +557,10 @@ async def on_settings_update(settings_dict: Dict):
 
     if ticker:
         cl.user_session.set("detected_tickers", [ticker])
-        await cl.Message(
-            content=f"Settings updated: **{ticker}** with {preset} preset"
-        ).send()
+    cl.user_session.set("current_preset", preset)
+    await cl.Message(
+        content=f"Settings updated: **{ticker}** with {preset} preset"
+    ).send()
 
 
 @cl.on_message
