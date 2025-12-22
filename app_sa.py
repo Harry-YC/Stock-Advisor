@@ -229,15 +229,36 @@ async def run_expert_panel(
 
     # Execute all experts concurrently
     tasks = [call_expert_async(name) for name in expert_names]
-    results = await asyncio.gather(*tasks)
+    logger.info(f"Waiting for {len(tasks)} expert tasks to complete...")
 
-    for expert_name, response, success in results:
-        responses[expert_name] = response
-        if not success:
+    try:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info(f"All expert tasks completed, processing {len(results)} results")
+    except Exception as e:
+        logger.error(f"asyncio.gather failed: {e}")
+        results = []
+
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            logger.error(f"Expert task {i} raised exception: {result}")
+            expert_name = expert_names[i] if i < len(expert_names) else f"Unknown-{i}"
+            responses[expert_name] = "*Analysis unavailable due to error*"
             failed_experts.append(expert_name)
+        else:
+            expert_name, response, success = result
+            responses[expert_name] = response
+            if not success:
+                failed_experts.append(expert_name)
+            else:
+                logger.info(f"Expert {expert_name} response length: {len(response)} chars")
 
     # Update progress to complete
-    await progress_msg.remove()
+    logger.info("Removing progress message...")
+    try:
+        await progress_msg.remove()
+        logger.info("Progress message removed successfully")
+    except Exception as e:
+        logger.error(f"Failed to remove progress message: {e}")
 
     # Notify user of any failures
     if failed_experts:
@@ -256,26 +277,65 @@ async def stream_expert_response(
     evidence_context: str,
     kol_context: str = ""
 ):
-    """Stream expert response chunks."""
-    for chunk in call_stock_expert_stream(
-        persona_name=expert_name,
-        question=question,
-        evidence_context=evidence_context,
-        kol_context=kol_context
-    ):
+    """Stream expert response chunks using thread pool to avoid blocking."""
+    import queue
+    import threading
+
+    result_queue = queue.Queue()
+    error_holder = [None]
+
+    def run_sync_generator():
+        try:
+            for chunk in call_stock_expert_stream(
+                persona_name=expert_name,
+                question=question,
+                evidence_context=evidence_context,
+                kol_context=kol_context
+            ):
+                result_queue.put(chunk)
+            result_queue.put(None)  # Signal completion
+        except Exception as e:
+            error_holder[0] = e
+            result_queue.put(None)
+
+    # Start the sync generator in a thread
+    thread = threading.Thread(target=run_sync_generator, daemon=True)
+    thread.start()
+
+    # Yield chunks as they become available
+    while True:
+        # Non-blocking check with small timeout to allow asyncio to breathe
+        try:
+            chunk = await asyncio.to_thread(result_queue.get, timeout=0.1)
+        except:
+            await asyncio.sleep(0.05)
+            continue
+
+        if chunk is None:
+            if error_holder[0]:
+                logger.error(f"Stream error: {error_holder[0]}")
+            break
+
         if chunk.get("type") == "chunk":
             yield chunk.get("content", "")
 
 
 async def display_expert_responses(responses: Dict[str, str], question: str):
     """Display expert responses with formatting."""
+    logger.info(f"display_expert_responses called with {len(responses)} responses")
+
     for expert_name, response in responses.items():
+        logger.info(f"Displaying response from {expert_name} ({len(response)} chars)")
         icon = EXPERT_ICONS.get(expert_name, "📊")
         advisory_summary = extract_advisory_summary(response)
         advisory_block = f"> {advisory_summary}\n\n" if advisory_summary else ""
-        await cl.Message(
-            content=f"## {icon} {expert_name}\n\n{advisory_block}{response}"
-        ).send()
+        try:
+            await cl.Message(
+                content=f"## {icon} {expert_name}\n\n{advisory_block}{response}"
+            ).send()
+            logger.info(f"Successfully displayed {expert_name} response")
+        except Exception as e:
+            logger.error(f"Failed to display {expert_name} response: {e}")
 
     # Store responses for follow-up
     cl.user_session.set("expert_responses", responses)
@@ -831,12 +891,19 @@ async def on_message(message: cl.Message):
     elif tickers:
         # Stock analysis with expert panel
         preset = cl.user_session.get("current_preset", "Quick Analysis")
-        responses = await run_expert_panel(
-            question=user_input,
-            tickers=tickers,
-            preset=preset
-        )
-        await display_expert_responses(responses, user_input)
+        logger.info(f"Starting expert panel for tickers={tickers}, preset={preset}")
+        try:
+            responses = await run_expert_panel(
+                question=user_input,
+                tickers=tickers,
+                preset=preset
+            )
+            logger.info(f"run_expert_panel returned {len(responses)} responses")
+            await display_expert_responses(responses, user_input)
+            logger.info("display_expert_responses completed")
+        except Exception as e:
+            logger.error(f"Expert panel failed: {e}", exc_info=True)
+            await cl.Message(content=f"**Error:** Analysis failed - {e}").send()
 
     else:
         # General question without specific tickers
