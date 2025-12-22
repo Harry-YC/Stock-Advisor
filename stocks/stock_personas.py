@@ -456,7 +456,16 @@ def get_stock_prompts(bullets_per_role: int = 10) -> Dict[str, Tuple[str, str]]:
             "- Explain your reasoning clearly\n"
             "- Flag key risks and uncertainties\n"
             "- Be objective - don't force a narrative if data doesn't support it\n"
-            "- Use confidence markers appropriately"
+            "- Use confidence markers appropriately\n\n"
+            "ADVISORY FORMAT (include this section near the top):\n"
+            "Recommendation: Buy | Sell | Hold (or Wait)\n"
+            "Time Horizon: Short-term | Medium-term | Long-term\n"
+            "Timing Guidance: Entry/exit levels or conditions (if applicable)\n"
+            "Confidence: High | Medium | Low\n"
+            "Key Reasons:\n"
+            "- 2-4 bullet points\n"
+            "Key Risks:\n"
+            "- 2-3 bullet points"
         )
 
         prompts[name] = (context, task)
