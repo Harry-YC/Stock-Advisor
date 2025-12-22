@@ -13,12 +13,68 @@ Stock Advisor - Expert Personas
 from typing import Dict, Tuple, List, Optional
 
 # Base context for all Stock Experts
+def get_market_time_context():
+    """
+    Get current market time context including:
+    - Date and time in Eastern Time
+    - Market status (Pre-market, Open, After-hours, Weekend)
+    - Quote freshness context
+    """
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        et = ZoneInfo("America/New_York")
+    except ImportError:
+        import pytz
+        et = pytz.timezone("America/New_York")
+
+    now = datetime.now(et)
+    weekday = now.weekday()  # 0=Monday, 6=Sunday
+    hour = now.hour
+    minute = now.minute
+
+    # Determine market status
+    is_weekend = weekday >= 5  # Saturday or Sunday
+
+    if is_weekend:
+        market_status = "CLOSED (Weekend)"
+        quote_note = "Quotes reflect Friday's closing prices."
+    elif hour < 4:
+        market_status = "CLOSED (Overnight)"
+        quote_note = "Quotes reflect previous day's close."
+    elif hour < 9 or (hour == 9 and minute < 30):
+        market_status = "PRE-MARKET (4:00-9:30 AM ET)"
+        quote_note = "Pre-market trading is active. Prices may gap at open."
+    elif hour < 16:
+        market_status = "MARKET OPEN (9:30 AM - 4:00 PM ET)"
+        quote_note = "Live trading session. Prices are real-time."
+    elif hour < 20:
+        market_status = "AFTER-HOURS (4:00-8:00 PM ET)"
+        quote_note = "After-hours trading active. Lower volume, higher spreads."
+    else:
+        market_status = "CLOSED (After 8 PM ET)"
+        quote_note = "Quotes reflect today's closing price."
+
+    return {
+        "datetime": now.strftime("%B %d, %Y %I:%M %p ET"),
+        "date": now.strftime("%B %d, %Y"),
+        "time": now.strftime("%I:%M %p ET"),
+        "weekday": now.strftime("%A"),
+        "market_status": market_status,
+        "quote_note": quote_note,
+        "is_weekend": is_weekend,
+        "is_market_open": "MARKET OPEN" in market_status,
+    }
+
+
 def get_stock_base_context():
-    """Get base context with current date injected."""
-    from datetime import date
-    today = date.today()
+    """Get base context with current date/time and market status injected."""
+    market = get_market_time_context()
+
     return (
-        f"TODAY'S DATE: {today.strftime('%B %d, %Y')} (Use this for all time references)\n\n"
+        f"CURRENT TIME: {market['datetime']} ({market['weekday']})\n"
+        f"MARKET STATUS: {market['market_status']}\n"
+        f"QUOTE CONTEXT: {market['quote_note']}\n\n"
         "You are a professional stock market analyst helping investors make informed decisions. "
         "Provide analysis based on real market data, financial metrics, and market trends. "
         "Focus on: objective analysis, risk awareness, and actionable insights. "
@@ -27,6 +83,11 @@ def get_stock_base_context():
         "- This is NOT financial advice. Users should consult licensed professionals.\n"
         "- Past performance does not guarantee future results.\n"
         "- Always consider your own risk tolerance and investment goals.\n\n"
+        "TIME-AWARE ANALYSIS:\n"
+        f"- Reference the current date ({market['date']}) when discussing events\n"
+        "- If market is closed, note that prices are from last session\n"
+        "- For earnings: check if report was BMO (before open) or AMC (after close)\n"
+        "- For news: distinguish between today's news vs older articles\n\n"
         "HANDLING DIFFERENT QUERY TYPES:\n"
         "- **Specific Stock**: When a ticker is provided, give detailed analysis\n"
         "- **General Questions**: Provide educational context and market principles\n"
@@ -43,7 +104,13 @@ def get_stock_base_context():
         "- [HISTORICAL] - Based on historical patterns and data\n"
         "- [ESTIMATE] - Approximate values based on analysis\n"
         "- [SPECULATIVE] - Forward-looking and uncertain\n"
-        "- [KOL INSIGHT] - Based on KOL content analysis\n"
+        "- [KOL INSIGHT] - Based on KOL content analysis\n\n"
+        "LANGUAGE INSTRUCTION:\n"
+        "- ALWAYS respond in the same language the user uses\n"
+        "- If user writes in 繁體中文 (Traditional Chinese), respond entirely in 繁體中文\n"
+        "- If user writes in 简体中文 (Simplified Chinese), respond in 简体中文\n"
+        "- If user mixes languages, respond in their primary language\n"
+        "- Keep ticker symbols, technical terms, and metrics in English (e.g., NVDA, P/E, RSI)\n"
     )
 
 
@@ -388,6 +455,26 @@ EXPERT_ICONS = {
     "Risk Manager": "🛡️",
 }
 
+# Bilingual expert names (English -> Traditional Chinese)
+EXPERT_NAMES_ZH_TW = {
+    "Bull Analyst": "牛市分析師",
+    "Bear Analyst": "熊市分析師",
+    "Technical Analyst": "技術分析師",
+    "Fundamental Analyst": "基本面分析師",
+    "Sentiment Analyst": "情緒分析師",
+    "Risk Manager": "風險管理師",
+}
+
+# Bilingual expert names (English -> Simplified Chinese)
+EXPERT_NAMES_ZH_CN = {
+    "Bull Analyst": "牛市分析师",
+    "Bear Analyst": "熊市分析师",
+    "Technical Analyst": "技术分析师",
+    "Fundamental Analyst": "基本面分析师",
+    "Sentiment Analyst": "情绪分析师",
+    "Risk Manager": "风险管理师",
+}
+
 # Expert Categories for UI grouping
 STOCK_CATEGORIES = {
     "Directional": ["Bull Analyst", "Bear Analyst"],
@@ -429,6 +516,56 @@ STOCK_PRESETS = {
         "description": "Get insights from all 6 stock experts"
     },
 }
+
+# Batch/Comparison Mode Instructions
+COMPARISON_INSTRUCTIONS = """
+When comparing multiple stocks, structure your analysis as follows:
+
+1. COMPARISON TABLE
+   Create a side-by-side comparison with key metrics for all stocks.
+   Include: Price, Market Cap, P/E, Revenue Growth, Margins, etc.
+
+2. RANKING
+   Rank the stocks from best to worst based on your specialty criteria.
+   Explain the ranking methodology clearly.
+
+3. STRONGEST PICK
+   Identify your top pick with detailed reasoning.
+   Include specific catalysts or concerns that differentiate it.
+
+4. CORRELATION ANALYSIS
+   Note any correlations between the stocks (same sector, competing, etc.)
+   Discuss diversification benefits if holding multiple.
+
+5. RELATIVE VALUE
+   Which stock offers the best risk/reward ratio?
+   Compare valuations relative to growth and quality.
+
+IMPORTANT:
+- Be specific with numbers - don't just say "higher" or "better"
+- Acknowledge when stocks are too different to compare directly
+- Consider both absolute and relative metrics
+"""
+
+
+def get_comparison_prompt(symbols: List[str]) -> str:
+    """
+    Build a comparison-focused prompt for multiple stocks.
+
+    Args:
+        symbols: List of stock tickers to compare
+
+    Returns:
+        Comparison prompt string
+    """
+    symbols_str = ", ".join(symbols)
+    return f"""
+You are analyzing and comparing the following stocks: {symbols_str}
+
+{COMPARISON_INSTRUCTIONS}
+
+Please provide a comprehensive comparison analysis focusing on your area of expertise.
+"""
 
 
 def get_stock_prompts(bullets_per_role: int = 10) -> Dict[str, Tuple[str, str]]:
@@ -761,3 +898,90 @@ def call_stock_expert_stream(
         logger.error(f"Stream error for {persona_name}: {e}")
         yield {'type': 'error', 'content': f"Error: {str(e)}"}
         yield {'type': 'complete', 'finish_reason': 'error', 'model': model}
+
+
+def detect_language(text: str) -> str:
+    """
+    Detect the primary language of user input.
+
+    Returns:
+        'zh_TW' for Traditional Chinese
+        'zh_CN' for Simplified Chinese
+        'en' for English (default)
+    """
+    if not text:
+        return 'en'
+
+    # Traditional Chinese specific characters (more common in TW/HK)
+    trad_chars = set('繁體國語實際學習經濟環濟會議機製電視臺灣開發設計變數顯現問題關係對應據說時間動態測試觀點這個裡兩個'
+                     '說話兒點開開關聲說發現還東當後過進與區個還見過關過進這適選過動員書電話車廣復練語談體')
+
+    # Simplified Chinese specific characters
+    simp_chars = set('简体国语实际学习经济环济会议机制电视台湾开发设计变数显现问题关系对应据说时间动态测试观点这个里两个'
+                     '说话儿点开开关声说发现还东当后过进与区个还见过关过进这适选过动员书电话车广复练语谈体')
+
+    # Count Chinese characters
+    trad_count = sum(1 for c in text if c in trad_chars)
+    simp_count = sum(1 for c in text if c in simp_chars)
+
+    # Check for any CJK characters
+    cjk_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+
+    if cjk_count == 0:
+        return 'en'
+
+    # If we have specific traditional/simplified markers
+    if trad_count > simp_count:
+        return 'zh_TW'
+    elif simp_count > trad_count:
+        return 'zh_CN'
+    elif cjk_count > len(text) * 0.1:  # More than 10% Chinese
+        return 'zh_TW'  # Default to Traditional for ambiguous Chinese
+
+    return 'en'
+
+
+def get_localized_expert_name(expert_name: str, lang: str = 'en') -> str:
+    """
+    Get localized expert name based on language.
+
+    Args:
+        expert_name: English expert name
+        lang: Language code ('en', 'zh_TW', 'zh_CN')
+
+    Returns:
+        Localized expert name with icon
+    """
+    icon = EXPERT_ICONS.get(expert_name, "")
+
+    if lang == 'zh_TW':
+        zh_name = EXPERT_NAMES_ZH_TW.get(expert_name, expert_name)
+        return f"{icon} {zh_name}"
+    elif lang == 'zh_CN':
+        zh_name = EXPERT_NAMES_ZH_CN.get(expert_name, expert_name)
+        return f"{icon} {zh_name}"
+    else:
+        return f"{icon} {expert_name}"
+
+
+def get_bilingual_expert_name(expert_name: str, lang: str = 'en') -> str:
+    """
+    Get expert name with both English and Chinese for clarity.
+
+    Args:
+        expert_name: English expert name
+        lang: Language code
+
+    Returns:
+        Bilingual expert name (e.g., "🐂 牛市分析師 (Bull Analyst)")
+    """
+    icon = EXPERT_ICONS.get(expert_name, "")
+
+    if lang == 'zh_TW':
+        zh_name = EXPERT_NAMES_ZH_TW.get(expert_name, expert_name)
+        return f"{icon} {zh_name} ({expert_name})"
+    elif lang == 'zh_CN':
+        zh_name = EXPERT_NAMES_ZH_CN.get(expert_name, expert_name)
+        return f"{icon} {zh_name} ({expert_name})"
+    else:
+        return f"{icon} {expert_name}"

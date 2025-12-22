@@ -35,6 +35,7 @@ from services.stock_data_service import (
     analyze_kol_screenshot,
     search_why_stock_moved,
 )
+from services.kol_analyzer import KOLAnalyzer, analyze_kol_text
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,19 @@ def extract_advisory_summary(response: str) -> str:
         if match:
             summary_lines.append(f"**{label}:** {match.group(1).strip()}")
     return "\n".join(summary_lines)
+
+
+def validate_tickers(tickers: List[str]) -> tuple[List[str], List[str]]:
+    """Validate a list of tickers, returning valid and invalid lists."""
+    valid = []
+    invalid = []
+    for ticker in tickers:
+        is_valid, result = validate_ticker(ticker)
+        if is_valid:
+            valid.append(result)
+        else:
+            invalid.append(ticker)
+    return valid, invalid
 
 
 # =============================================================================
@@ -171,20 +185,24 @@ async def run_expert_panel(
     kol_context: str = ""
 ) -> Dict[str, str]:
     """Run expert panel analysis on stocks."""
+    logger.info(f"Running expert panel: preset={preset}, tickers={tickers}")
     preset_config = STOCK_PRESETS.get(preset, STOCK_PRESETS["Quick Analysis"])
     expert_names = preset_config["experts"]
 
     responses = {}
     primary_ticker = tickers[0] if tickers else None
 
-    # Fetch stock data for context
+    # Fetch stock data for context (run in thread to avoid blocking)
+    # Enable market search for real-time news via Google Search grounding
     evidence_context = ""
     if primary_ticker:
-        stock_context = fetch_stock_data(
+        stock_context = await asyncio.to_thread(
+            fetch_stock_data,
             primary_ticker,
             include_quote=True,
             include_financials=True,
-            include_news=True
+            include_news=True,
+            include_market_search=True,  # Real-time Google Search grounding
         )
         evidence_context = stock_context.to_prompt_context()
 
@@ -195,27 +213,39 @@ async def run_expert_panel(
     ).send()
 
     # Run experts in parallel
-    async def call_expert_async(expert_name: str) -> tuple[str, str]:
+    failed_experts = []
+
+    async def call_expert_async(expert_name: str) -> tuple[str, str, bool]:
         try:
             full_response = ""
             async for chunk in stream_expert_response(
                 expert_name, question, evidence_context, kol_context
             ):
                 full_response += chunk
-            return expert_name, full_response
+            return expert_name, full_response, True
         except Exception as e:
             logger.error(f"Expert {expert_name} failed: {e}")
-            return expert_name, f"*Error: {str(e)}*"
+            return expert_name, f"*Analysis unavailable*", False
 
     # Execute all experts concurrently
     tasks = [call_expert_async(name) for name in expert_names]
     results = await asyncio.gather(*tasks)
 
-    for expert_name, response in results:
+    for expert_name, response, success in results:
         responses[expert_name] = response
+        if not success:
+            failed_experts.append(expert_name)
 
     # Update progress to complete
     await progress_msg.remove()
+
+    # Notify user of any failures
+    if failed_experts:
+        await cl.Message(
+            content=f"⚠️ Some experts encountered issues: {', '.join(failed_experts)}. "
+                    f"Analysis may be incomplete."
+        ).send()
+        logger.warning(f"Expert panel partial failure: {failed_experts}")
 
     return responses
 
@@ -273,10 +303,19 @@ async def handle_image_upload(message: cl.Message):
     MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 
     supported_types = {'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'}
+    processed_any = False
 
     for element in message.elements:
         if element.mime not in supported_types:
+            await cl.Message(
+                content=f"⚠️ Unsupported file type: `{element.mime}`. "
+                        f"Supported: PNG, JPEG, GIF, WebP."
+            ).send()
+            logger.info(f"Skipped unsupported file type: {element.mime}")
             continue
+
+        processed_any = True
+        logger.info(f"Processing image upload: type={element.mime}")
 
         # Validate size
         if element.path and os.path.exists(element.path):
@@ -285,21 +324,24 @@ async def handle_image_upload(message: cl.Message):
                 await cl.Message(
                     content=f"Image too large ({file_size/1024/1024:.1f}MB). Max 5MB allowed."
                 ).send()
+                logger.warning(f"Image rejected: size={file_size/1024/1024:.1f}MB exceeds limit")
                 continue
 
         # Analyze the screenshot
         async with cl.Step(name="KOL Screenshot Analysis", type="tool") as step:
             step.output = "Analyzing screenshot..."
 
-            result = analyze_kol_screenshot(element.path)
+            result = await asyncio.to_thread(analyze_kol_screenshot, element.path)
 
             if not result["success"]:
                 await cl.Message(
                     content=f"**Analysis failed:** {result['error']}"
                 ).send()
+                logger.error(f"KOL screenshot analysis failed: {result.get('error')}")
                 return
 
             ocr = result["ocr_result"]
+            logger.info(f"KOL analysis complete: tickers={ocr.get('tickers')}, sentiment={ocr.get('sentiment')}")
 
         # Display extracted info
         summary_lines = ["## 📸 KOL Screenshot Analyzed\n"]
@@ -396,6 +438,148 @@ async def on_validate_claims(action: cl.Action):
         return
 
     question = f"Validate these claims about {', '.join(tickers)}: {'; '.join(claims)}"
+
+    responses = await run_expert_panel(
+        question=question,
+        tickers=tickers,
+        preset="Deep Dive"
+    )
+    await display_expert_responses(responses, question)
+
+
+# =============================================================================
+# KOL Text Analysis Handler
+# =============================================================================
+
+def detect_kol_text(text: str) -> bool:
+    """
+    Detect if the input looks like a KOL opinion to analyze.
+
+    Patterns that suggest KOL text:
+    - Starts with "analyze this" or similar
+    - Contains @ mentions
+    - Long text with stock opinions
+    - Quoted text or multiple lines
+    """
+    text_lower = text.lower().strip()
+
+    # Explicit instructions to analyze
+    analyze_triggers = [
+        "analyze this",
+        "what do you think of this",
+        "evaluate this",
+        "review this opinion",
+        "is this true",
+        "validate this",
+        "here's what",
+        "this person says",
+        "according to",
+    ]
+
+    for trigger in analyze_triggers:
+        if text_lower.startswith(trigger):
+            return True
+
+    # Contains @ mentions and is relatively long
+    has_mentions = "@" in text and len(text) > 100
+
+    # Multiple lines or quoted text
+    has_quotes = text.count('"') >= 2 or text.count("'") >= 2
+    is_multiline = "\n" in text and len(text) > 150
+
+    # Contains opinion indicators
+    opinion_words = ["bullish", "bearish", "buy", "sell", "long", "short", "target", "prediction"]
+    has_opinion = any(word in text_lower for word in opinion_words)
+
+    return (has_mentions and has_opinion) or (is_multiline and has_opinion) or (has_quotes and len(text) > 100)
+
+
+async def handle_kol_text(text: str):
+    """
+    Handle pasted KOL text for analysis.
+
+    Extracts claims, displays summary, and runs expert panel.
+    """
+    async with cl.Step(name="Analyzing KOL Opinion", type="tool") as step:
+        step.output = "Extracting claims..."
+        claim = await asyncio.to_thread(analyze_kol_text, text)
+        step.output = f"Found: @{claim.author} on {claim.ticker or 'general market'}"
+
+    # Display extracted info
+    await cl.Message(content=f"## 📝 KOL Opinion Extracted\n\n{claim.format_summary()}").send()
+
+    # Store for follow-up
+    cl.user_session.set("kol_claim", claim)
+    if claim.ticker:
+        cl.user_session.set("detected_tickers", [claim.ticker])
+
+    # Build KOL context for experts
+    analyzer = KOLAnalyzer()
+    kol_context = analyzer.format_for_expert_context(claim)
+
+    # Offer analysis options
+    if claim.ticker:
+        actions = [
+            cl.Action(
+                name="analyze_kol_claim",
+                label=f"📊 Analyze {claim.ticker}",
+                value=claim.ticker,
+                payload={"ticker": claim.ticker}
+            ),
+            cl.Action(
+                name="validate_kol_claim",
+                label="✅ Validate Claims",
+                value="validate",
+                payload={}
+            ),
+        ]
+        await cl.Message(
+            content="What would you like me to do with this opinion?",
+            actions=actions
+        ).send()
+    else:
+        await cl.Message(
+            content="No specific ticker found. You can ask me to analyze a particular stock mentioned."
+        ).send()
+
+
+@cl.action_callback("analyze_kol_claim")
+async def on_analyze_kol_claim(action: cl.Action):
+    """Analyze ticker from KOL text claim."""
+    ticker = action.payload.get("ticker", action.value)
+    claim = cl.user_session.get("kol_claim")
+
+    kol_context = ""
+    if claim:
+        analyzer = KOLAnalyzer()
+        kol_context = analyzer.format_for_expert_context(claim)
+
+    question = f"Analyze {ticker} stock and evaluate the KOL's thesis"
+
+    responses = await run_expert_panel(
+        question=question,
+        tickers=[ticker],
+        preset="KOL Review",
+        kol_context=kol_context
+    )
+    await display_expert_responses(responses, question)
+
+
+@cl.action_callback("validate_kol_claim")
+async def on_validate_kol_claim(action: cl.Action):
+    """Validate claims from KOL text."""
+    claim = cl.user_session.get("kol_claim")
+    if not claim:
+        await cl.Message(content="No KOL claim to validate.").send()
+        return
+
+    tickers = [claim.ticker] if claim.ticker else []
+    if not tickers:
+        await cl.Message(content="No ticker found in the claim to validate.").send()
+        return
+
+    claims_text = "; ".join(claim.key_points) if claim.key_points else claim.thesis
+    question = f"Validate these claims about {claim.ticker}: {claims_text}"
 
     responses = await run_expert_panel(
         question=question,
@@ -537,13 +721,14 @@ Hi! I'm your AI stock analysis assistant with 6 expert perspectives:
 - 📰 **Sentiment Analyst** - News and social sentiment
 - 🛡️ **Risk Manager** - Position sizing and risk
 
-**Ask me anything about stocks**, or upload a KOL screenshot for analysis.
+**Ask me anything about stocks**, upload a screenshot, or paste a KOL opinion.
 
 _Examples:_
 - "Why did NVDA fall yesterday?"
 - "Analyze AAPL stock"
 - "Compare TSLA and RIVN"
-- [Upload screenshot of a stock tweet]
+- Upload a screenshot of a stock tweet
+- Paste a KOL's opinion: "Analyze this: @investor says NVDA will hit $200..."
 
 ⚠️ *Not financial advice. Always do your own research.*"""
     ).send()
@@ -555,12 +740,25 @@ async def on_settings_update(settings_dict: Dict):
     ticker = settings_dict.get("ticker", "").upper().strip()
     preset = settings_dict.get("preset", "Quick Analysis")
 
-    if ticker:
-        cl.user_session.set("detected_tickers", [ticker])
+    # Always persist the preset selection
     cl.user_session.set("current_preset", preset)
-    await cl.Message(
-        content=f"Settings updated: **{ticker}** with {preset} preset"
-    ).send()
+    logger.info(f"Preset updated: {preset}")
+
+    if ticker:
+        is_valid, validated = validate_ticker(ticker)
+        if is_valid:
+            cl.user_session.set("detected_tickers", [validated])
+            await cl.Message(
+                content=f"Settings updated: **{validated}** with {preset} preset"
+            ).send()
+        else:
+            await cl.Message(
+                content=f"Invalid ticker '{ticker}'. Please use 1-5 letters (e.g., NVDA, AAPL)."
+            ).send()
+    else:
+        await cl.Message(
+            content=f"Expert panel updated: **{preset}**"
+        ).send()
 
 
 @cl.on_message
@@ -581,13 +779,28 @@ async def on_message(message: cl.Message):
         await cl.Message(content="Please enter a question or upload an image.").send()
         return
 
+    # Check if this looks like pasted KOL text to analyze
+    if detect_kol_text(user_input):
+        logger.info("Detected KOL text input")
+        await handle_kol_text(user_input)
+        return
+
     # Extract analysis request
     async with cl.Step(name="Understanding Request", type="run") as step:
         request = await extract_analysis_request(user_input)
         step.output = f"Detected: {request.get('question_type', 'analysis')}"
 
-    tickers = request.get("tickers", [])
+    raw_tickers = request.get("tickers", [])
     question_type = request.get("question_type", "analysis")
+
+    # Validate extracted tickers
+    tickers, invalid_tickers = validate_tickers(raw_tickers)
+    logger.info(f"Extracted tickers: {tickers}, question_type: {question_type}")
+
+    if invalid_tickers:
+        await cl.Message(
+            content=f"⚠️ Skipping invalid ticker(s): {', '.join(invalid_tickers)}"
+        ).send()
 
     # Store detected tickers
     if tickers:
@@ -598,7 +811,9 @@ async def on_message(message: cl.Message):
         # Special handling for "why did X move" questions
         direction = request.get("direction", "moved")
         async with cl.Step(name="Market Search", type="tool") as step:
-            explanation = search_why_stock_moved(tickers[0], direction)
+            explanation = await asyncio.to_thread(
+                search_why_stock_moved, tickers[0], direction
+            )
             step.output = f"Found explanation for {tickers[0]}"
 
         await cl.Message(

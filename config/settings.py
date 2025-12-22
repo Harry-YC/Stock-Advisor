@@ -98,7 +98,36 @@ MAX_IMAGE_SIZE_MB = 5
 
 # MCP Server Configuration
 MCP_SERVER_PORT = int(os.getenv("MCP_SERVER_PORT", "8080"))
-ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL", "60"))
+ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL", "300"))  # 5 minutes
+
+# =============================================================================
+# EMAIL NOTIFICATIONS
+# =============================================================================
+
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+ALERT_EMAIL = os.getenv("ALERT_EMAIL")  # Recipient for alerts
+ENABLE_EMAIL_ALERTS = bool(SMTP_USER and SMTP_PASSWORD and ALERT_EMAIL)
+
+# =============================================================================
+# VOICE INPUT (WHISPER)
+# =============================================================================
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # For Whisper API
+ENABLE_VOICE_INPUT = bool(OPENAI_API_KEY)
+
+# =============================================================================
+# CHART GENERATION
+# =============================================================================
+
+CHARTS_DIR = OUTPUTS_DIR / "charts"
+CHARTS_DIR.mkdir(parents=True, exist_ok=True)
+
+CHART_THEME = os.getenv("CHART_THEME", "plotly_dark")
+CHART_WIDTH = int(os.getenv("CHART_WIDTH", "1200"))
+CHART_HEIGHT = int(os.getenv("CHART_HEIGHT", "800"))
 
 # =============================================================================
 # FEATURE FLAGS
@@ -106,6 +135,9 @@ ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL", "60"))
 
 ENABLE_AI_FEATURES = bool(GEMINI_API_KEY)
 ENABLE_EXPERT_PANEL = bool(GEMINI_API_KEY)
+ENABLE_CHARTS = True  # Charts use Plotly (no API key needed)
+ENABLE_OPTIONS = True  # Options use yfinance (free)
+ENABLE_SEC_FILINGS = True  # SEC EDGAR is free
 
 # =============================================================================
 # VALIDATION
@@ -121,6 +153,12 @@ def validate_config():
     if not FINNHUB_API_KEY:
         warnings.append("FINNHUB_API_KEY not set - real-time stock data disabled")
 
+    if not ENABLE_EMAIL_ALERTS:
+        warnings.append("Email alerts not configured (SMTP_USER, SMTP_PASSWORD, ALERT_EMAIL)")
+
+    if not ENABLE_VOICE_INPUT:
+        warnings.append("Voice input not configured (OPENAI_API_KEY for Whisper)")
+
     return warnings
 
 
@@ -129,11 +167,19 @@ if __name__ == "__main__":
     print("=" * 50)
     print(f"\nApp Root: {APP_ROOT}")
     print(f"Outputs: {OUTPUTS_DIR}")
+    print(f"Charts: {CHARTS_DIR}")
+    print(f"Exports: {EXPORTS_DIR}")
     print(f"\nAPI Status:")
     print(f"  Gemini AI: {'Enabled' if GEMINI_API_KEY else 'Disabled'}")
     print(f"  Finnhub: {'Enabled' if ENABLE_FINNHUB else 'Disabled'}")
     print(f"  Vision OCR: {'Enabled' if ENABLE_VISION_OCR else 'Disabled'}")
     print(f"  Search Grounding: {'Enabled' if ENABLE_GOOGLE_SEARCH_GROUNDING else 'Disabled'}")
+    print(f"\nNew Features:")
+    print(f"  Charts: {'Enabled' if ENABLE_CHARTS else 'Disabled'}")
+    print(f"  Options Data: {'Enabled' if ENABLE_OPTIONS else 'Disabled'}")
+    print(f"  SEC Filings: {'Enabled' if ENABLE_SEC_FILINGS else 'Disabled'}")
+    print(f"  Voice Input: {'Enabled' if ENABLE_VOICE_INPUT else 'Disabled'}")
+    print(f"  Email Alerts: {'Enabled' if ENABLE_EMAIL_ALERTS else 'Disabled'}")
 
     warnings = validate_config()
     if warnings:
@@ -141,4 +187,4 @@ if __name__ == "__main__":
         for w in warnings:
             print(f"  - {w}")
     else:
-        print("\n✓ All APIs configured")
+        print("\n✓ All features configured")

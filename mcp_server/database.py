@@ -149,6 +149,188 @@ class SentimentEntry:
         }
 
 
+@dataclass
+class ChatMessage:
+    """A chat message in history."""
+    id: int
+    session_id: str
+    role: str  # 'user' or 'assistant'
+    content: str
+    expert_responses: Optional[Dict[str, str]]
+    tickers: Optional[List[str]]
+    timestamp: datetime
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "role": self.role,
+            "content": self.content,
+            "expert_responses": self.expert_responses,
+            "tickers": self.tickers,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+        }
+
+
+@dataclass
+class ChatSession:
+    """A chat session."""
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    summary: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "summary": self.summary,
+        }
+
+
+@dataclass
+class Trade:
+    """A recorded trade for performance tracking."""
+    id: int
+    symbol: str
+    action: str  # 'buy' or 'sell'
+    shares: float
+    price: float
+    fees: float
+    trade_date: datetime
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "symbol": self.symbol,
+            "action": self.action,
+            "shares": self.shares,
+            "price": self.price,
+            "fees": self.fees,
+            "total_value": self.shares * self.price,
+            "trade_date": self.trade_date.isoformat() if self.trade_date else None,
+            "notes": self.notes,
+        }
+
+
+@dataclass
+class DailySnapshot:
+    """Daily portfolio snapshot for performance tracking."""
+    id: int
+    date: str
+    total_value: float
+    total_cost: float
+    daily_pnl: float
+    daily_pnl_pct: float
+    positions_json: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        import json
+        return {
+            "id": self.id,
+            "date": self.date,
+            "total_value": self.total_value,
+            "total_cost": self.total_cost,
+            "daily_pnl": self.daily_pnl,
+            "daily_pnl_pct": self.daily_pnl_pct,
+            "positions": json.loads(self.positions_json) if self.positions_json else {},
+        }
+
+
+@dataclass
+class KOLClaim:
+    """A tracked claim from a KOL."""
+    id: int
+    author: str
+    platform: str
+    ticker: str
+    claim_type: str  # price_target, direction, earnings_beat, etc.
+    target_price: Optional[float]
+    target_date: Optional[str]
+    direction: str  # bullish, bearish
+    thesis: str
+    source_text: str
+    price_at_claim: Optional[float]
+    created_at: datetime
+    outcome: Optional[str] = None  # hit, miss, pending, expired
+    outcome_checked_at: Optional[datetime] = None
+    outcome_price: Optional[float] = None
+    return_pct: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "author": self.author,
+            "platform": self.platform,
+            "ticker": self.ticker,
+            "claim_type": self.claim_type,
+            "target_price": self.target_price,
+            "target_date": self.target_date,
+            "direction": self.direction,
+            "thesis": self.thesis,
+            "source_text": self.source_text,
+            "price_at_claim": self.price_at_claim,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "outcome": self.outcome,
+            "outcome_checked_at": self.outcome_checked_at.isoformat() if self.outcome_checked_at else None,
+            "outcome_price": self.outcome_price,
+            "return_pct": self.return_pct,
+        }
+
+    def format_summary(self) -> str:
+        """Format claim as readable string."""
+        status = self.outcome or "pending"
+        target = f"${self.target_price:.2f}" if self.target_price else self.direction
+        return f"@{self.author}: {self.ticker} → {target} [{status}]"
+
+
+@dataclass
+class KOLScore:
+    """Aggregated score for a KOL."""
+    author: str
+    total_claims: int
+    hits: int
+    misses: int
+    pending: int
+    expired: int
+    accuracy_pct: float
+    avg_return: float
+    best_call: Optional[str]
+    worst_call: Optional[str]
+    last_updated: datetime
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "author": self.author,
+            "total_claims": self.total_claims,
+            "hits": self.hits,
+            "misses": self.misses,
+            "pending": self.pending,
+            "expired": self.expired,
+            "accuracy_pct": self.accuracy_pct,
+            "avg_return": self.avg_return,
+            "best_call": self.best_call,
+            "worst_call": self.worst_call,
+            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+        }
+
+    def format_scorecard(self) -> str:
+        """Format as markdown scorecard."""
+        total_resolved = self.hits + self.misses
+        accuracy_str = f"{self.accuracy_pct:.0f}%" if total_resolved > 0 else "N/A"
+        return f"""📊 @{self.author} Track Record
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Accuracy: {accuracy_str} ({self.hits}/{total_resolved} calls)
+Avg Return: {self.avg_return:+.1f}%
+Pending: {self.pending} | Expired: {self.expired}
+Best: {self.best_call or 'N/A'}
+Worst: {self.worst_call or 'N/A'}"""
+
+
 class FinancialDatabase:
     """
     SQLite database for financial MCP server.
@@ -248,6 +430,80 @@ class FinancialDatabase:
                 )
             """)
 
+            # Chat sessions table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY,
+                    title TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    summary TEXT DEFAULT ''
+                )
+            """)
+
+            # Chat history table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    expert_responses TEXT,
+                    tickers TEXT,
+                    timestamp TEXT NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """)
+
+            # Trades table for performance tracking
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS trades (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    action TEXT NOT NULL CHECK(action IN ('buy', 'sell')),
+                    shares REAL NOT NULL,
+                    price REAL NOT NULL,
+                    fees REAL DEFAULT 0,
+                    trade_date TEXT NOT NULL,
+                    notes TEXT DEFAULT ''
+                )
+            """)
+
+            # Daily snapshots for performance tracking
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS daily_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL UNIQUE,
+                    total_value REAL NOT NULL,
+                    total_cost REAL NOT NULL,
+                    daily_pnl REAL NOT NULL,
+                    daily_pnl_pct REAL NOT NULL,
+                    positions_json TEXT
+                )
+            """)
+
+            # KOL claims tracking
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS kol_claims (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    author TEXT NOT NULL,
+                    platform TEXT DEFAULT '',
+                    ticker TEXT NOT NULL,
+                    claim_type TEXT DEFAULT 'direction',
+                    target_price REAL,
+                    target_date TEXT,
+                    direction TEXT NOT NULL,
+                    thesis TEXT DEFAULT '',
+                    source_text TEXT NOT NULL,
+                    price_at_claim REAL,
+                    created_at TEXT NOT NULL,
+                    outcome TEXT DEFAULT 'pending',
+                    outcome_checked_at TEXT,
+                    outcome_price REAL,
+                    return_pct REAL
+                )
+            """)
+
             # Create indexes
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_symbol ON alerts(symbol)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(is_active)")
@@ -255,6 +511,13 @@ class FinancialDatabase:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_symbol ON watchlist(symbol)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sentiment_symbol ON sentiment_cache(symbol)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sentiment_captured ON sentiment_cache(captured_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_history(session_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(trade_date)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_date ON daily_snapshots(date)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_kol_claims_author ON kol_claims(author)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_kol_claims_ticker ON kol_claims(ticker)")
 
             logger.info(f"Database initialized at {self.db_path}")
 
@@ -743,6 +1006,413 @@ class FinancialDatabase:
             deleted = cursor.rowcount
             if deleted:
                 logger.info(f"Cleaned up {deleted} old sentiment entries")
+
+    # =========================================================================
+    # CHAT HISTORY
+    # =========================================================================
+
+    def create_session(self, session_id: str, title: str = "") -> ChatSession:
+        """Create a new chat session."""
+        import json
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO sessions (id, title, created_at, updated_at, summary)
+                VALUES (?, ?, ?, ?, '')
+            """, (session_id, title or "New Session", now, now))
+
+            return ChatSession(
+                id=session_id,
+                title=title or "New Session",
+                created_at=datetime.fromisoformat(now),
+                updated_at=datetime.fromisoformat(now),
+                summary="",
+            )
+
+    def save_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        expert_responses: Optional[Dict[str, str]] = None,
+        tickers: Optional[List[str]] = None
+    ) -> ChatMessage:
+        """Save a chat message to history."""
+        import json
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
+
+            # Ensure session exists
+            cursor.execute("SELECT id FROM sessions WHERE id = ?", (session_id,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO sessions (id, title, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                """, (session_id, content[:50] if content else "New Session", now, now))
+
+            # Update session timestamp and title if first message
+            cursor.execute("""
+                UPDATE sessions SET updated_at = ?,
+                    title = CASE WHEN title = 'New Session' OR title = '' THEN ? ELSE title END
+                WHERE id = ?
+            """, (now, content[:50] if content else "New Session", session_id))
+
+            # Save message
+            expert_json = json.dumps(expert_responses) if expert_responses else None
+            tickers_json = json.dumps(tickers) if tickers else None
+
+            cursor.execute("""
+                INSERT INTO chat_history (session_id, role, content, expert_responses, tickers, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (session_id, role, content, expert_json, tickers_json, now))
+
+            msg_id = cursor.lastrowid
+            return ChatMessage(
+                id=msg_id,
+                session_id=session_id,
+                role=role,
+                content=content,
+                expert_responses=expert_responses,
+                tickers=tickers,
+                timestamp=datetime.fromisoformat(now),
+            )
+
+    def get_session_history(self, session_id: str, limit: int = 50) -> List[ChatMessage]:
+        """Get chat history for a session."""
+        import json
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM chat_history
+                WHERE session_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (session_id, limit))
+
+            messages = []
+            for row in cursor.fetchall():
+                messages.append(ChatMessage(
+                    id=row["id"],
+                    session_id=row["session_id"],
+                    role=row["role"],
+                    content=row["content"],
+                    expert_responses=json.loads(row["expert_responses"]) if row["expert_responses"] else None,
+                    tickers=json.loads(row["tickers"]) if row["tickers"] else None,
+                    timestamp=datetime.fromisoformat(row["timestamp"]) if row["timestamp"] else None,
+                ))
+            return list(reversed(messages))  # Oldest first
+
+    def list_sessions(self, limit: int = 20) -> List[ChatSession]:
+        """List recent chat sessions."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM sessions
+                ORDER BY updated_at DESC
+                LIMIT ?
+            """, (limit,))
+
+            return [ChatSession(
+                id=row["id"],
+                title=row["title"] or "",
+                created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+                updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
+                summary=row["summary"] or "",
+            ) for row in cursor.fetchall()]
+
+    def update_session_summary(self, session_id: str, summary: str) -> bool:
+        """Update session summary (AI-generated)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE sessions SET summary = ? WHERE id = ?
+            """, (summary, session_id))
+            return cursor.rowcount > 0
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session and its messages."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chat_history WHERE session_id = ?", (session_id,))
+            cursor.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            return cursor.rowcount > 0
+
+    # =========================================================================
+    # TRADES & PERFORMANCE
+    # =========================================================================
+
+    def record_trade(
+        self,
+        symbol: str,
+        action: str,
+        shares: float,
+        price: float,
+        fees: float = 0,
+        trade_date: Optional[datetime] = None,
+        notes: str = ""
+    ) -> Trade:
+        """Record a trade for performance tracking."""
+        symbol = symbol.upper()
+        action = action.lower()
+        if action not in ("buy", "sell"):
+            raise ValueError(f"Invalid action: {action}. Use 'buy' or 'sell'.")
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            trade_dt = (trade_date or datetime.now()).isoformat()
+
+            cursor.execute("""
+                INSERT INTO trades (symbol, action, shares, price, fees, trade_date, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (symbol, action, shares, price, fees, trade_dt, notes))
+
+            trade_id = cursor.lastrowid
+            logger.info(f"Recorded trade: {action} {shares} {symbol} @ ${price}")
+
+            return Trade(
+                id=trade_id,
+                symbol=symbol,
+                action=action,
+                shares=shares,
+                price=price,
+                fees=fees,
+                trade_date=datetime.fromisoformat(trade_dt),
+                notes=notes,
+            )
+
+    def get_trades(
+        self,
+        symbol: Optional[str] = None,
+        days: Optional[int] = None
+    ) -> List[Trade]:
+        """Get trade history."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = "SELECT * FROM trades"
+            params = []
+            conditions = []
+
+            if symbol:
+                conditions.append("symbol = ?")
+                params.append(symbol.upper())
+
+            if days:
+                cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+                conditions.append("trade_date >= ?")
+                params.append(cutoff)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY trade_date DESC"
+            cursor.execute(query, params)
+
+            return [Trade(
+                id=row["id"],
+                symbol=row["symbol"],
+                action=row["action"],
+                shares=row["shares"],
+                price=row["price"],
+                fees=row["fees"],
+                trade_date=datetime.fromisoformat(row["trade_date"]) if row["trade_date"] else None,
+                notes=row["notes"] or "",
+            ) for row in cursor.fetchall()]
+
+    def save_daily_snapshot(
+        self,
+        total_value: float,
+        total_cost: float,
+        positions: Dict[str, Any]
+    ) -> DailySnapshot:
+        """Save daily portfolio snapshot."""
+        import json
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            # Calculate daily P&L
+            daily_pnl = total_value - total_cost
+            daily_pnl_pct = (daily_pnl / total_cost * 100) if total_cost > 0 else 0
+
+            positions_json = json.dumps(positions)
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO daily_snapshots
+                (date, total_value, total_cost, daily_pnl, daily_pnl_pct, positions_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (today, total_value, total_cost, daily_pnl, daily_pnl_pct, positions_json))
+
+            snapshot_id = cursor.lastrowid
+            logger.info(f"Saved daily snapshot: ${total_value:.2f} ({daily_pnl_pct:+.2f}%)")
+
+            return DailySnapshot(
+                id=snapshot_id,
+                date=today,
+                total_value=total_value,
+                total_cost=total_cost,
+                daily_pnl=daily_pnl,
+                daily_pnl_pct=daily_pnl_pct,
+                positions_json=positions_json,
+            )
+
+    def get_snapshots(self, days: int = 30) -> List[DailySnapshot]:
+        """Get daily snapshots for the last N days."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+            cursor.execute("""
+                SELECT * FROM daily_snapshots
+                WHERE date >= ?
+                ORDER BY date ASC
+            """, (cutoff,))
+
+            return [DailySnapshot(
+                id=row["id"],
+                date=row["date"],
+                total_value=row["total_value"],
+                total_cost=row["total_cost"],
+                daily_pnl=row["daily_pnl"],
+                daily_pnl_pct=row["daily_pnl_pct"],
+                positions_json=row["positions_json"] or "{}",
+            ) for row in cursor.fetchall()]
+
+    # =========================================================================
+    # KOL CLAIMS
+    # =========================================================================
+
+    def save_kol_claim(
+        self,
+        author: str,
+        ticker: str,
+        direction: str,
+        source_text: str,
+        platform: str = "",
+        claim_type: str = "direction",
+        target_price: Optional[float] = None,
+        target_date: Optional[str] = None,
+        thesis: str = "",
+        price_at_claim: Optional[float] = None,
+    ) -> KOLClaim:
+        """Save a KOL claim for tracking."""
+        ticker = ticker.upper()
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
+
+            cursor.execute("""
+                INSERT INTO kol_claims
+                (author, platform, ticker, claim_type, target_price, target_date,
+                 direction, thesis, source_text, price_at_claim, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (author, platform, ticker, claim_type, target_price, target_date,
+                  direction, thesis, source_text, price_at_claim, now))
+
+            claim_id = cursor.lastrowid
+            logger.info(f"Saved KOL claim: @{author} on {ticker} ({direction})")
+
+            return KOLClaim(
+                id=claim_id,
+                author=author,
+                platform=platform,
+                ticker=ticker,
+                claim_type=claim_type,
+                target_price=target_price,
+                target_date=target_date,
+                direction=direction,
+                thesis=thesis,
+                source_text=source_text,
+                price_at_claim=price_at_claim,
+                created_at=datetime.fromisoformat(now),
+            )
+
+    def get_kol_claims(
+        self,
+        author: Optional[str] = None,
+        ticker: Optional[str] = None,
+        limit: int = 50
+    ) -> List[KOLClaim]:
+        """Get KOL claims with optional filters."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = "SELECT * FROM kol_claims"
+            params = []
+            conditions = []
+
+            if author:
+                conditions.append("author = ?")
+                params.append(author)
+
+            if ticker:
+                conditions.append("ticker = ?")
+                params.append(ticker.upper())
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+
+            cursor.execute(query, params)
+
+            return [self._row_to_kol_claim(row) for row in cursor.fetchall()]
+
+    def get_author_stats(self, author: str) -> Dict[str, Any]:
+        """Get basic stats for a KOL author."""
+        claims = self.get_kol_claims(author=author, limit=100)
+
+        if not claims:
+            return {
+                "author": author,
+                "total_claims": 0,
+                "tickers": [],
+                "directions": {"bullish": 0, "bearish": 0},
+            }
+
+        tickers = list(set(c.ticker for c in claims))
+        directions = {"bullish": 0, "bearish": 0}
+        for c in claims:
+            if c.direction.lower() in directions:
+                directions[c.direction.lower()] += 1
+
+        return {
+            "author": author,
+            "total_claims": len(claims),
+            "tickers": tickers,
+            "directions": directions,
+            "first_claim": claims[-1].created_at.isoformat() if claims else None,
+            "last_claim": claims[0].created_at.isoformat() if claims else None,
+        }
+
+    def _row_to_kol_claim(self, row: sqlite3.Row) -> KOLClaim:
+        """Convert database row to KOLClaim."""
+        return KOLClaim(
+            id=row["id"],
+            author=row["author"],
+            platform=row["platform"] or "",
+            ticker=row["ticker"],
+            claim_type=row["claim_type"] or "direction",
+            target_price=row["target_price"],
+            target_date=row["target_date"],
+            direction=row["direction"],
+            thesis=row["thesis"] or "",
+            source_text=row["source_text"],
+            price_at_claim=row["price_at_claim"],
+            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+            outcome=row["outcome"],
+            outcome_checked_at=datetime.fromisoformat(row["outcome_checked_at"]) if row["outcome_checked_at"] else None,
+            outcome_price=row["outcome_price"],
+            return_pct=row["return_pct"],
+        )
 
 
 # Singleton instance

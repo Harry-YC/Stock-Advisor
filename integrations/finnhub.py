@@ -214,6 +214,77 @@ class CompanyNews:
         }
 
 
+@dataclass
+class CandleData:
+    """OHLCV candle data for charting."""
+    symbol: str
+    resolution: str  # 1, 5, 15, 30, 60, D, W, M
+    timestamps: List[int]
+    opens: List[float]
+    highs: List[float]
+    lows: List[float]
+    closes: List[float]
+    volumes: List[int]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "resolution": self.resolution,
+            "timestamps": self.timestamps,
+            "opens": self.opens,
+            "highs": self.highs,
+            "lows": self.lows,
+            "closes": self.closes,
+            "volumes": self.volumes,
+        }
+
+    @property
+    def dates(self) -> List[datetime]:
+        """Convert timestamps to datetime objects."""
+        return [datetime.fromtimestamp(ts) for ts in self.timestamps]
+
+    def __len__(self) -> int:
+        return len(self.timestamps)
+
+
+@dataclass
+class EarningsEvent:
+    """Earnings calendar event."""
+    symbol: str
+    date: str
+    eps_estimate: Optional[float] = None
+    eps_actual: Optional[float] = None
+    revenue_estimate: Optional[float] = None
+    revenue_actual: Optional[float] = None
+    hour: Optional[str] = None  # 'bmo' (before market), 'amc' (after market)
+    quarter: Optional[int] = None
+    year: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if v is not None}
+
+    @property
+    def surprise_pct(self) -> Optional[float]:
+        """Calculate EPS surprise percentage."""
+        if self.eps_actual is not None and self.eps_estimate is not None and self.eps_estimate != 0:
+            return ((self.eps_actual - self.eps_estimate) / abs(self.eps_estimate)) * 100
+        return None
+
+    def format_summary(self) -> str:
+        """Format earnings event as readable string."""
+        parts = [f"{self.symbol} - {self.date}"]
+        if self.hour:
+            parts.append(f"({self.hour.upper()})")
+        if self.eps_estimate:
+            parts.append(f"EPS Est: ${self.eps_estimate:.2f}")
+        if self.eps_actual:
+            surprise = self.surprise_pct
+            if surprise is not None:
+                emoji = "✅" if surprise >= 0 else "❌"
+                parts.append(f"Actual: ${self.eps_actual:.2f} {emoji} ({surprise:+.1f}%)")
+        return " | ".join(parts)
+
+
 class FinnhubClient:
     """
     Client for Finnhub API.
@@ -229,6 +300,8 @@ class FinnhubClient:
     PROFILE_CACHE_TTL = 3600  # 1 hour
     FINANCIALS_CACHE_TTL = 3600  # 1 hour
     NEWS_CACHE_TTL = 900  # 15 minutes
+    CANDLE_CACHE_TTL = 3600  # 1 hour for daily candles
+    EARNINGS_CACHE_TTL = 86400  # 1 day for earnings calendar
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or getattr(settings, 'FINNHUB_API_KEY', None) or os.getenv("FINNHUB_API_KEY")
@@ -501,6 +574,195 @@ class FinnhubClient:
                 summary = news.summary[:150] + "..." if len(news.summary) > 150 else news.summary
                 lines.append(f"   {summary}")
             lines.append("")
+
+        return "\n".join(lines)
+
+    def get_candles(
+        self,
+        symbol: str,
+        resolution: str = "D",
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None
+    ) -> Optional[CandleData]:
+        """
+        Get OHLCV candle data for charting.
+
+        Args:
+            symbol: Stock ticker symbol
+            resolution: Candle resolution (1, 5, 15, 30, 60, D, W, M)
+            from_date: Start date (defaults to 6 months ago)
+            to_date: End date (defaults to today)
+
+        Returns:
+            CandleData object or None
+        """
+        symbol = symbol.upper()
+
+        # Default date range: last 6 months
+        if not to_date:
+            to_date = datetime.now()
+        if not from_date:
+            from_date = to_date - timedelta(days=180)
+
+        # Convert to Unix timestamps
+        from_ts = int(from_date.timestamp())
+        to_ts = int(to_date.timestamp())
+
+        cache_key = f"candles:{symbol}:{resolution}:{from_ts}:{to_ts}"
+
+        cached = self._get_cache(cache_key, self.CANDLE_CACHE_TTL)
+        if cached:
+            return cached
+
+        try:
+            data = self._make_request("stock/candle", {
+                "symbol": symbol,
+                "resolution": resolution,
+                "from": from_ts,
+                "to": to_ts,
+            })
+
+            if not data or data.get("s") == "no_data" or not data.get("c"):
+                logger.warning(f"No candle data for {symbol}")
+                return None
+
+            candles = CandleData(
+                symbol=symbol,
+                resolution=resolution,
+                timestamps=data.get("t", []),
+                opens=data.get("o", []),
+                highs=data.get("h", []),
+                lows=data.get("l", []),
+                closes=data.get("c", []),
+                volumes=data.get("v", []),
+            )
+
+            self._set_cache(cache_key, candles)
+            logger.info(f"Retrieved {len(candles)} candles for {symbol}")
+            return candles
+
+        except Exception as e:
+            logger.error(f"Candle fetch failed for {symbol}: {e}")
+            return None
+
+    def get_earnings_calendar(
+        self,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        symbol: Optional[str] = None
+    ) -> List[EarningsEvent]:
+        """
+        Get earnings calendar.
+
+        Args:
+            from_date: Start date (YYYY-MM-DD), defaults to today
+            to_date: End date (YYYY-MM-DD), defaults to 30 days from now
+            symbol: Optional filter by symbol
+
+        Returns:
+            List of EarningsEvent objects
+        """
+        # Default date range: next 30 days
+        if not from_date:
+            from_date = datetime.now().strftime("%Y-%m-%d")
+        if not to_date:
+            to_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+
+        cache_key = f"earnings:{from_date}:{to_date}:{symbol or 'all'}"
+
+        cached = self._get_cache(cache_key, self.EARNINGS_CACHE_TTL)
+        if cached:
+            return cached
+
+        try:
+            params = {"from": from_date, "to": to_date}
+            if symbol:
+                params["symbol"] = symbol.upper()
+
+            data = self._make_request("calendar/earnings", params)
+
+            if not data or not data.get("earningsCalendar"):
+                logger.warning("No earnings calendar data")
+                return []
+
+            events = []
+            for item in data["earningsCalendar"]:
+                events.append(EarningsEvent(
+                    symbol=item.get("symbol", ""),
+                    date=item.get("date", ""),
+                    eps_estimate=item.get("epsEstimate"),
+                    eps_actual=item.get("epsActual"),
+                    revenue_estimate=item.get("revenueEstimate"),
+                    revenue_actual=item.get("revenueActual"),
+                    hour=item.get("hour"),
+                    quarter=item.get("quarter"),
+                    year=item.get("year"),
+                ))
+
+            # Filter by symbol if specified
+            if symbol:
+                events = [e for e in events if e.symbol.upper() == symbol.upper()]
+
+            self._set_cache(cache_key, events)
+            logger.info(f"Retrieved {len(events)} earnings events")
+            return events
+
+        except Exception as e:
+            logger.error(f"Earnings calendar fetch failed: {e}")
+            return []
+
+    def get_earnings_history(self, symbol: str, limit: int = 4) -> List[EarningsEvent]:
+        """
+        Get historical earnings for a stock.
+
+        Args:
+            symbol: Stock ticker symbol
+            limit: Number of past quarters
+
+        Returns:
+            List of EarningsEvent objects (most recent first)
+        """
+        symbol = symbol.upper()
+        cache_key = f"earnings_history:{symbol}"
+
+        cached = self._get_cache(cache_key, self.EARNINGS_CACHE_TTL)
+        if cached:
+            return cached[:limit]
+
+        try:
+            data = self._make_request("stock/earnings", {"symbol": symbol})
+
+            if not data:
+                logger.warning(f"No earnings history for {symbol}")
+                return []
+
+            events = []
+            for item in data[:limit]:
+                events.append(EarningsEvent(
+                    symbol=symbol,
+                    date=item.get("period", ""),
+                    eps_estimate=item.get("estimate"),
+                    eps_actual=item.get("actual"),
+                    quarter=item.get("quarter"),
+                    year=item.get("year"),
+                ))
+
+            self._set_cache(cache_key, events)
+            logger.info(f"Retrieved {len(events)} historical earnings for {symbol}")
+            return events
+
+        except Exception as e:
+            logger.error(f"Earnings history fetch failed for {symbol}: {e}")
+            return []
+
+    def format_earnings(self, events: List[EarningsEvent], max_items: int = 5) -> str:
+        """Format earnings events for display."""
+        if not events:
+            return "No earnings data available."
+
+        lines = ["## Earnings\n"]
+        for event in events[:max_items]:
+            lines.append(event.format_summary())
 
         return "\n".join(lines)
 
