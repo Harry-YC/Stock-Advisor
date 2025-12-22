@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Travel Planner** is an AI-powered travel planning app using Chainlit. Users can describe their trip naturally or use ChatSettings, and get personalized recommendations from 8 AI travel experts with real-time data from weather, flight, hotel, and restaurant APIs.
+**Stock Advisor** is an AI-powered stock analysis app using Chainlit. Users can ask about stocks, upload KOL screenshots, and get personalized analysis from 6 AI stock experts with real-time data from Finnhub and Google Search.
 
 ## Quick Start
 
@@ -14,81 +14,60 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Run the app
-chainlit run app_tp2.py
+chainlit run app_sa.py
 
 # Development mode (auto-reload)
-chainlit run app_tp2.py -w
+chainlit run app_sa.py -w
 ```
 
 ## Core Workflow
 
-1. **Conversational intake** - Tell the app about your trip naturally
-2. **Confirm details** - Review extracted trip info
+1. **Ask about stocks** - Type a ticker or question like "Analyze NVDA"
+2. **Upload KOL screenshots** - Share Twitter/Reddit posts for analysis
 3. **Expert recommendations** - Get advice from selected expert panel
 4. **Follow-up questions** - Ask specific experts for more details
-5. **Export** - Download as Excel or Word document
+5. **Track portfolio** - Use MCP tools for alerts and positions
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | Frontend | Chainlit 1.3+ |
-| AI Model | Google Gemini 3 Pro |
-| Maps/Hotels | Google Maps Grounding (Gemini 2.5 Flash) |
-| Search | Google Search Grounding |
-| Weather | OpenWeatherMap API |
-| Flights | Amadeus Self-Service API |
-| Cars | Amadeus Self-Service API |
-| Places | Google Places API (New) |
-| Export | openpyxl (Excel), python-docx (Word) |
+| AI Model | Google Gemini 3 Pro/Flash |
+| Stock Data | Finnhub API |
+| News Search | Google Search Grounding |
+| Vision OCR | Gemini Vision (2.0 Flash) |
+| Persistence | SQLite (MCP server) |
 
 ## Project Structure
 
 ```
-Travel Planner/
-├── app_tp2.py                    # Main Chainlit app (~1500 lines)
+Stock Advisor/
+├── app_sa.py                     # Main Chainlit app
 ├── chainlit.md                   # Welcome message
-├── Procfile                      # Railway/Heroku deployment
-├── railway.toml                  # Railway configuration
 ├── requirements.txt              # Python dependencies
-├── pytest.ini                    # Test configuration
 │
 ├── config/
 │   └── settings.py               # Centralized configuration
 │
-├── core/
-│   ├── logger.py                 # Logging setup
-│   ├── utils.py                  # General utilities
-│   └── database.py               # SQLite DAOs (optional)
+├── stocks/
+│   └── stock_personas.py         # 6 Expert definitions + presets
 │
 ├── integrations/
-│   ├── weather.py                # OpenWeatherMap client
-│   ├── amadeus_flights.py        # Flight search
-│   ├── amadeus_cars.py           # Car rental search
-│   ├── google_search.py          # Google Search + Maps grounding
-│   └── google_places.py          # Places ratings (thread-safe cache)
+│   ├── finnhub.py                # Finnhub API client (quotes, financials, news)
+│   ├── gemini_vision.py          # KOL screenshot OCR
+│   └── market_search.py          # Google Search grounding for stocks
 │
 ├── services/
 │   ├── llm_router.py             # Gemini API routing
-│   ├── travel_data_service.py    # Data aggregation + prompt sanitization
-│   ├── place_enrichment_service.py # Google Places trust scoring
-│   ├── excel_export_service.py   # Professional Excel export
-│   └── word_export_service.py    # Word document export
+│   └── stock_data_service.py     # Multi-source data aggregation
 │
-├── tests/
-│   ├── conftest.py               # Pytest fixtures
-│   ├── run_tests.py              # Test runner script
-│   ├── test_file_upload_validation.py
-│   ├── test_excel_traveler_extraction.py
-│   ├── test_security.py
-│   ├── test_places_enrichment.py
-│   └── README.md                 # Test documentation
+├── mcp_server/
+│   ├── database.py               # SQLite for alerts, portfolio, watchlist
+│   └── financial_mcp.py          # MCP tools (13 tools)
 │
-├── travel/
-│   └── travel_personas.py        # 8 Expert definitions + presets
-│
-└── ui/
-    └── home.py                   # Streamlit UI components
+└── outputs/
+    └── stock_advisor.db          # SQLite database (auto-created)
 ```
 
 ## Environment Variables
@@ -97,147 +76,101 @@ Travel Planner/
 # Required
 GEMINI_API_KEY=xxx                # From aistudio.google.com
 
-# Optional - Enhanced features
-OPENWEATHER_API_KEY=xxx           # Weather forecasts
-AMADEUS_API_KEY=xxx               # Flight search
-AMADEUS_API_SECRET=xxx            # Flight search
-GOOGLE_PLACES_API_KEY=xxx         # Place ratings
+# Recommended
+FINNHUB_API_KEY=xxx               # From finnhub.io (free: 60 calls/min)
+
+# Optional
+APP_ENV=dev                       # Environment (dev/prod)
+API_TIMEOUT=240                   # API timeout in seconds
 ```
 
-## 8 Travel Experts
+## 6 Stock Experts
 
 | Expert | Icon | Focus |
 |--------|------|-------|
-| Budget Advisor | 💰 | Cost optimization, deals, budget allocation |
-| Logistics Planner | 🚗 | Transportation, car rentals, routes |
-| Safety Expert | 🛡️ | Travel advisories, insurance, visa requirements |
-| Weather Analyst | 🌤️ | Climate, packing, seasonal events |
-| Local Culture Guide | 🎎 | Customs, etiquette, authentic experiences |
-| Food & Dining Expert | 🍜 | Restaurants, reservations, payment tips |
-| Activity Curator | 🎯 | Tours, attractions, day trips |
-| Accommodation Specialist | 🏨 | Hotels, neighborhoods, booking tips |
+| Bull Analyst | :green_circle: | Growth catalysts, upside targets, bullish scenarios |
+| Bear Analyst | :red_circle: | Risk factors, downside targets, valuation concerns |
+| Technical Analyst | :chart_with_upwards_trend: | Chart patterns, support/resistance, indicators |
+| Fundamental Analyst | :bar_chart: | Financials, valuation metrics, DCF analysis |
+| Sentiment Analyst | :speech_balloon: | News sentiment, KOL analysis, social trends |
+| Risk Manager | :shield: | Position sizing, hedging, stop-loss strategy |
 
 ## Expert Presets
 
 | Preset | Experts Included |
 |--------|------------------|
-| Quick Trip Planning | Budget, Logistics, Accommodation, Activity |
-| Adventure Travel | Safety, Activity, Weather, Culture |
-| Budget Backpacking | Budget, Accommodation, Food, Safety |
-| Cultural Immersion | Culture, Food, Activity |
-| Family Vacation | Safety, Accommodation, Activity, Logistics |
-| Full Panel | All 8 experts |
+| Quick Analysis | Bull, Bear, Technical |
+| Deep Dive | Bull, Bear, Technical, Fundamental, Risk |
+| KOL Review | Sentiment, Bull, Bear |
+| Trade Planning | Technical, Risk |
+| Full Panel | All 6 experts |
 
 ## Key Features
 
-### Smart Google Search Triggers
-- **Safety Expert**: Always gets real-time travel advisories, visa requirements
-- **Near-term trips** (<30 days): All experts get current events context
-- **Historical weather**: Shows climate patterns for trips >5 days out
+### KOL Screenshot Analysis
+- Upload screenshots from Twitter/X, Reddit, StockTwits
+- Automatic ticker extraction via Gemini Vision OCR
+- Sentiment classification (bullish/bearish/neutral/mixed)
+- Key claims extraction for expert validation
 
-### Restaurant Intelligence
-- Filters out closed restaurants by default
-- Flags cash-only restaurants
-- Indicates when reservations are needed
+### Real-Time Stock Data
+- Finnhub integration for quotes, financials, news
+- 5-min cache for quotes, 1-hour for fundamentals
+- Rate limiting (60 req/min on free tier)
 
-### Professional Export
-- **Excel**: 8 sheets with budget tracking, itinerary, checklists
-- **Word**: Formatted document with all recommendations
+### Google Search Grounding
+- Real-time market news and analyst ratings
+- "Why did X stock move?" explanations
+- Earnings and guidance updates
+
+### MCP Tools (13 tools)
+| Tool | Description |
+|------|-------------|
+| `stock_quote` | Real-time price and metrics |
+| `stock_financials` | Fundamental financial data |
+| `stock_news` | Recent news articles |
+| `add_alert` | Set price alert (above/below) |
+| `list_alerts` | View active alerts |
+| `delete_alert` | Remove an alert |
+| `portfolio_add` | Add position with cost basis |
+| `portfolio_view` | View holdings with P&L |
+| `portfolio_sell` | Sell/reduce position |
+| `kol_sentiment` | Aggregated KOL sentiment |
+| `watchlist_add` | Add to watchlist |
+| `watchlist_view` | View watchlist |
+| `watchlist_remove` | Remove from watchlist |
 
 ## User Commands
 
 | Command | Action |
 |---------|--------|
-| "Plan my trip" | Run expert panel with current settings |
-| "Ask [Expert] about..." | Consult specific expert |
-| "Show car rentals" | Fetch car rental options on demand |
-| General question | Auto-routes to best expert |
-
-## Deployment
-
-### Railway
-```bash
-railway up
-```
-
-### Environment Setup
-1. Create project on Railway
-2. Add environment variables in Railway dashboard
-3. Deploy from GitHub or CLI
+| "Analyze NVDA" | Run expert panel analysis |
+| "Why did TSLA fall?" | Search for movement explanation |
+| "Ask Bull about AAPL" | Consult specific expert |
+| [Upload screenshot] | OCR + sentiment analysis |
 
 ## API Costs (Approximate)
 
 | API | Free Tier | Cost After |
 |-----|-----------|------------|
 | Gemini | Generous | Pay-per-token |
-| OpenWeatherMap | 1,000 calls/day | $0.001/call |
-| Amadeus | 2,000 calls/month | Contact for pricing |
-| Google Places | $200/month credit | $0.032/search |
-
-## Testing
-
-### Quick Test Commands
-
-```bash
-# Run all unit tests
-python3 tests/run_tests.py
-
-# Run specific test file
-python3 -m pytest tests/test_security.py -v
-
-# Run with coverage
-python3 tests/run_tests.py --coverage
-
-# Run E2E tests (requires running server)
-python3 tests/run_tests.py --e2e
-```
-
-### Test Coverage
-
-| Test File | Tests | Features Covered |
-|-----------|-------|------------------|
-| `test_file_upload_validation.py` | 9 | 10MB doc limit, 5MB image limit |
-| `test_excel_traveler_extraction.py` | 12 | "Group (4+)" regex, parser |
-| `test_security.py` | 14 | Prompt injection, exception sanitization |
-| `test_places_enrichment.py` | 30 | Trust scoring, place extraction |
-
-See `tests/README.md` for full documentation.
+| Finnhub | 60 calls/min | Premium plans available |
+| Google Search | Included with Gemini | - |
 
 ## Security Features
 
 ### Prompt Injection Protection
-- `_sanitize_for_prompt()` in `travel_data_service.py`
+- `_sanitize_for_prompt()` in stock_data_service.py
 - Blocks "ignore previous instructions" patterns
-- Limits input to 200 characters
-- Removes special characters
-
-### Exception Sanitization
-- User-facing errors are generic ("Please try again")
-- Full stack traces logged server-side with `exc_info=True`
-- No file paths or internal details exposed
+- Limits input length
 
 ### Thread-Safe Caching
-- `GooglePlacesClient` uses `threading.RLock()`
+- Finnhub client uses `threading.RLock()`
 - All cache operations protected
-- Safe for concurrent requests
 
 ### File Upload Limits
-- Documents: 10MB maximum
-- Images: 5MB per image maximum
-- Validated before processing
-
-## Recent Updates (Dec 2025)
-
-1. **Google Search grounding** for Safety Expert
-2. **Closed restaurant filtering** via businessStatus
-3. **Reservation/payment alerts** in Food expert
-4. **Historical weather** for future trips
-5. **Conversational intake** flow
-6. **Expert follow-up suggestions**
-7. **Professional Excel export** with 8 sheets
-8. **Google Places auto-enrichment** for expert responses
-9. **Security hardening** - prompt injection protection, exception sanitization
-10. **Comprehensive test suite** with 65+ tests
+- Images: 5MB maximum
+- Supported: PNG, JPG, JPEG, GIF, WebP
 
 ## Troubleshooting
 
@@ -245,14 +178,28 @@ See `tests/README.md` for full documentation.
 - Create fresh key from AI Studio (not Cloud Console)
 - Enable "Generative Language API" in Cloud Console
 
-### No flight results
-- Check Amadeus credentials are correct
-- Verify airport codes are valid (uses IATA)
+### No stock data
+- Verify FINNHUB_API_KEY is set correctly
+- Check API rate limits (60/min free tier)
 
-### Weather unavailable
-- OpenWeatherMap free tier limited to 5-day forecast
-- Historical data shown for trips >5 days out
+### Vision OCR fails
+- Ensure image is under 5MB
+- Use supported format (PNG, JPG, etc.)
 
-## Contributing
+## Development
 
-See `CODE_REVIEW.md` for architecture details and improvement suggestions.
+### Run MCP Server Standalone
+```bash
+python -m mcp_server.financial_mcp
+```
+
+### Database Location
+SQLite database is created at:
+`outputs/stock_advisor.db`
+
+Contains tables:
+- `alerts` - Price alerts
+- `portfolio` - Stock positions
+- `watchlist` - Watched tickers
+- `sentiment_cache` - KOL sentiment history
+- `alert_history` - Triggered alert log

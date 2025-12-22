@@ -1,5 +1,5 @@
 """
-Configuration settings for Travel Planner App
+Configuration settings for Stock Advisor App
 
 Centralizes all app configuration including:
 - API keys and credentials
@@ -48,16 +48,16 @@ OPENAI_TIMEOUT = API_TIMEOUT  # Alias for llm_utils compatibility
 # UI CONFIGURATION
 # =============================================================================
 
-APP_TITLE = "Travel Planner"
-APP_ICON = "✈️"
+APP_TITLE = "Stock Advisor"
+APP_ICON = "📊"
 SIDEBAR_STATE = "expanded"
 
-# Theme colors - Travel theme
-PRIMARY_COLOR = "#2196F3"  # Travel Blue
-SECONDARY_COLOR = "#4CAF50"  # Green
-SUCCESS_COLOR = "#8BC34A"
+# Theme colors - Stock/Finance theme
+PRIMARY_COLOR = "#1976D2"  # Finance Blue
+SECONDARY_COLOR = "#388E3C"  # Money Green
+SUCCESS_COLOR = "#4CAF50"  # Bull Green
 WARNING_COLOR = "#FFC107"
-ERROR_COLOR = "#F44336"
+ERROR_COLOR = "#D32F2F"  # Bear Red
 
 # Page configuration
 PAGE_LAYOUT = "wide"
@@ -86,26 +86,45 @@ MAPS_GROUNDING_MODEL = os.getenv("MAPS_GROUNDING_MODEL", "gemini-2.5-flash")
 ENABLE_MAPS_GROUNDING = bool(GEMINI_API_KEY)
 
 # =============================================================================
-# TRAVEL API CONFIGURATION
+# STOCK API CONFIGURATION
+# =============================================================================
+
+# Finnhub API (Real-time stock data)
+# Register free at: https://finnhub.io/ (60 calls/min free)
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
+ENABLE_FINNHUB = bool(FINNHUB_API_KEY)
+
+# Cache TTLs (seconds)
+QUOTE_CACHE_TTL = 300  # 5 minutes for real-time quotes
+FINANCIALS_CACHE_TTL = 3600  # 1 hour for fundamental data
+NEWS_CACHE_TTL = 900  # 15 minutes for news
+
+# Vision OCR for KOL screenshots
+ENABLE_VISION_OCR = bool(GEMINI_API_KEY)
+MAX_IMAGE_SIZE_MB = 5
+
+# MCP Server Configuration
+MCP_SERVER_PORT = int(os.getenv("MCP_SERVER_PORT", "8080"))
+ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL", "60"))
+
+# =============================================================================
+# LEGACY TRAVEL API CONFIGURATION (Keep for compatibility)
 # =============================================================================
 
 # Amadeus Self-Service API (Flight, Hotel, Car Rental Search)
-# Register free at: https://developers.amadeus.com/
 AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
 AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
 AMADEUS_BASE_URL = "https://api.amadeus.com"
 ENABLE_FLIGHT_SEARCH = bool(AMADEUS_API_KEY and AMADEUS_API_SECRET)
 ENABLE_CAR_RENTAL = bool(AMADEUS_API_KEY and AMADEUS_API_SECRET)
 
-# OpenWeatherMap API (Weather Forecasts)
-# Register free at: https://openweathermap.org/api (1000 calls/day free)
+# OpenWeatherMap API
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/3.0"
 ENABLE_WEATHER_API = bool(OPENWEATHER_API_KEY)
 
-# Google Places API (Place ratings and reviews)
-# Uses GOOGLE_PLACES_API_KEY from Cloud Console - enable Places API (New)
-# Free tier: $200/month credit (~6,000 text searches)
+# Google Places API
 ENABLE_PLACES_API = bool(GOOGLE_PLACES_API_KEY)
 PLACES_CACHE_HOURS = 24
 PLACES_MIN_REVIEWS_TRUSTED = 100
@@ -128,28 +147,22 @@ def validate_config():
     if not GEMINI_API_KEY:
         warnings.append("GEMINI_API_KEY not set - AI features will be disabled")
 
-    if not AMADEUS_API_KEY or not AMADEUS_API_SECRET:
-        warnings.append("Amadeus credentials not set - flight search disabled")
-
-    if not OPENWEATHER_API_KEY:
-        warnings.append("OPENWEATHER_API_KEY not set - weather forecasts disabled")
-
-    if not GOOGLE_PLACES_API_KEY:
-        warnings.append("GOOGLE_PLACES_API_KEY not set - place ratings disabled")
+    if not FINNHUB_API_KEY:
+        warnings.append("FINNHUB_API_KEY not set - real-time stock data disabled")
 
     return warnings
 
 
 if __name__ == "__main__":
-    print("Travel Planner App - Configuration")
+    print("Stock Advisor App - Configuration")
     print("=" * 50)
     print(f"\nApp Root: {APP_ROOT}")
     print(f"Outputs: {OUTPUTS_DIR}")
     print(f"\nAPI Status:")
     print(f"  Gemini AI: {'Enabled' if GEMINI_API_KEY else 'Disabled'}")
-    print(f"  Places API: {'Enabled' if ENABLE_PLACES_API else 'Disabled'}")
-    print(f"  Weather API: {'Enabled' if ENABLE_WEATHER_API else 'Disabled'}")
-    print(f"  Flight API: {'Enabled' if ENABLE_FLIGHT_SEARCH else 'Disabled'}")
+    print(f"  Finnhub: {'Enabled' if ENABLE_FINNHUB else 'Disabled'}")
+    print(f"  Vision OCR: {'Enabled' if ENABLE_VISION_OCR else 'Disabled'}")
+    print(f"  Search Grounding: {'Enabled' if ENABLE_GOOGLE_SEARCH_GROUNDING else 'Disabled'}")
 
     warnings = validate_config()
     if warnings:

@@ -1,32 +1,44 @@
-# Travel Planner
+# Stock Advisor
 
-Your AI-powered travel planning assistant with 8 expert personas.
+Your AI-powered stock analysis assistant with 6 expert perspectives.
 
 ## Getting Started
 
-1. **Configure your trip** - Click the settings icon (gear) to set:
-   - Destination
-   - Travel dates
-   - Budget
-   - Number of travelers
-   - Expert panel preset
+1. **Ask about any stock** - Type a ticker or ask a question like:
+   - "Analyze NVDA"
+   - "Why did TSLA fall today?"
+   - "What's the bull case for AAPL?"
 
-2. **Plan your trip** - Say "Plan my trip" to get comprehensive recommendations from the expert panel
+2. **Upload KOL screenshots** - Share screenshots from Twitter/X, Reddit, StockTwits to get:
+   - Automatic ticker extraction
+   - Sentiment analysis
+   - Expert validation of claims
 
-3. **Ask questions** - Chat naturally about your trip or consult specific experts
+3. **Choose your experts** - Click settings to select expert presets:
+   - Quick Analysis
+   - Deep Dive
+   - KOL Review
+   - Trade Planning
+   - Full Panel
 
-## Expert Presets
+## Expert Panel
 
-- **Quick Trip Planning** - Essential experts for fast planning
-- **Adventure Travel** - Outdoor activities and safety focus
-- **Budget Backpacking** - Maximum value planning
-- **Cultural Immersion** - Local experiences and food
-- **Family Vacation** - Safety, logistics, and family-friendly options
-- **Full Panel** - All 8 experts for comprehensive coverage
+| Expert | Focus |
+|--------|-------|
+| Bull Analyst | Growth catalysts, upside targets, bullish scenarios |
+| Bear Analyst | Risk factors, downside targets, valuation concerns |
+| Technical Analyst | Chart patterns, support/resistance, indicators |
+| Fundamental Analyst | Financials, valuation metrics, DCF analysis |
+| Sentiment Analyst | News sentiment, KOL analysis, social trends |
+| Risk Manager | Position sizing, hedging, stop-loss strategy |
 
 ## Real-Time Data
 
-When available, you'll get actual prices and availability from:
-- OpenWeatherMap (weather forecasts)
-- Amadeus (flights and car rentals)
-- Google Maps (hotel ratings and reviews)
+When configured, you'll get live data from:
+- **Finnhub** - Real-time quotes, financials, company news
+- **Google Search** - Latest market news and analyst ratings
+- **Gemini Vision** - KOL screenshot OCR and analysis
+
+## MCP Tools
+
+Portfolio tracking, price alerts, and watchlist management are available through MCP tools.
