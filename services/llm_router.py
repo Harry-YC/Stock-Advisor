@@ -1,5 +1,5 @@
 """
-LLM Router Service for Travel Planner
+LLM Router Service
 
 Provides a unified interface for Gemini LLM calls.
 Uses Google's native Gemini SDK for optimal performance.
@@ -178,7 +178,7 @@ class LLMRouter:
 
     Usage:
         router = LLMRouter()
-        response = router.call_expert("Plan a trip to Barcelona", system="You are a travel expert...")
+        response = router.call_expert("Analyze NVDA stock", system="You are a stock analyst...")
     """
 
     def __init__(

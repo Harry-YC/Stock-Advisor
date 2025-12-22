@@ -1,54 +1,41 @@
 """
-Services Layer for Travel Planner
+Services Layer for Stock Advisor
 
-Business logic services for the travel planning application.
+Business logic services for the stock analysis application.
 
 Services:
-- expert_service: AI travel expert panel discussions
-- travel_data_service: Weather, flights, car rentals, hotels
-- place_enrichment_service: Google Places ratings and trust scores
-- excel_export_service: Export trip plans to Excel
+- stock_data_service: Aggregate stock data from multiple sources
 - llm_router: Routes LLM calls to appropriate models
 
 Usage:
     from services import (
-        ExpertDiscussionService,
-        TravelDataService,
-        PlaceEnrichmentService,
+        fetch_stock_data,
+        extract_tickers,
         LLMRouter,
     )
 """
 
-# Expert panel service
-from services.expert_service import ExpertDiscussionService, DiscussionRoundResult
-
-# Travel data fetching
-from services.travel_data_service import TravelDataService, get_travel_data_context
-
-# Place enrichment with Google Places
-from services.place_enrichment_service import PlaceEnrichmentService, EnrichedPlace
-
-# Excel export
-from services.excel_export_service import ExcelExportService
+# Stock data fetching
+from services.stock_data_service import (
+    fetch_stock_data,
+    fetch_multi_stock_data,
+    extract_tickers,
+    build_expert_context,
+    analyze_kol_screenshot,
+    StockDataContext,
+)
 
 # LLM routing
 from services.llm_router import LLMRouter, get_llm_router
 
 __all__ = [
-    # Expert services
-    'ExpertDiscussionService',
-    'DiscussionRoundResult',
-
-    # Travel data
-    'TravelDataService',
-    'get_travel_data_context',
-
-    # Place enrichment
-    'PlaceEnrichmentService',
-    'EnrichedPlace',
-
-    # Excel export
-    'ExcelExportService',
+    # Stock data
+    'fetch_stock_data',
+    'fetch_multi_stock_data',
+    'extract_tickers',
+    'build_expert_context',
+    'analyze_kol_screenshot',
+    'StockDataContext',
 
     # LLM
     'LLMRouter',

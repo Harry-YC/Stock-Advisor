@@ -1,5 +1,5 @@
 """
-Configuration Package for Travel Planner
+Configuration Package for Stock Advisor
 
 Provides centralized configuration for the application.
 
@@ -8,7 +8,7 @@ Usage:
 
     # Access settings
     api_key = settings.GEMINI_API_KEY
-    enable_weather = settings.ENABLE_WEATHER_API
+    enable_finnhub = settings.ENABLE_FINNHUB
 """
 
 from config import settings

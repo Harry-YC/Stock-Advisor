@@ -1,5 +1,5 @@
-# Travel Planner - Dependencies
-# Last updated: 2025-12-16
+# Stock Advisor - Dependencies
+# Last updated: 2025-12-23
 
 # =============================================================================
 # Core Framework
@@ -11,38 +11,20 @@ python-dotenv>=1.0.0
 # AI & LLM
 # =============================================================================
 openai>=1.0.0                    # OpenAI-compatible API for Gemini
-google-generativeai>=0.8.0       # Native Gemini SDK (for grounding)
-google-genai>=0.5.0              # New Gemini SDK (for Maps grounding)
+google-generativeai>=0.8.0       # Native Gemini SDK (for grounding + vision)
 
 # =============================================================================
 # API Clients
 # =============================================================================
-requests>=2.31.0                 # HTTP client for APIs
+requests>=2.31.0                 # HTTP client for Finnhub API
 aiohttp>=3.9.0                   # Async HTTP for Chainlit
 
 # =============================================================================
 # Data Processing
 # =============================================================================
-pandas>=2.0.0                    # Data manipulation
 python-dateutil>=2.8.2           # Date parsing
 
 # =============================================================================
-# Document Export & Import
+# MCP Server (Optional)
 # =============================================================================
-python-docx>=0.8.11              # Word document export/import
-openpyxl>=3.1.0                  # Excel export/import
-PyPDF2>=3.0.0                    # PDF reading
-
-# =============================================================================
-# Database (Optional - SQLite persistence)
-# =============================================================================
-aiosqlite>=0.19.0                # Async SQLite
-sqlalchemy>=2.0.0                # ORM
-
-# =============================================================================
-# Development & Testing
-# =============================================================================
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-pytest-playwright>=0.4.0
-playwright>=1.40.0
+# mcp>=1.0.0                     # Model Context Protocol (uncomment if needed)

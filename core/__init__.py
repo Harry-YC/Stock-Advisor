@@ -1,5 +1,5 @@
 """
-Core Module for Travel Planner
+Core Module for Stock Advisor
 
 Provides essential utilities and services:
 - llm_utils: LLM helper functions

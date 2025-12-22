@@ -37,9 +37,6 @@ for dir_path in [OUTPUTS_DIR, EXPORTS_DIR]:
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 GEMINI_BASE_URL = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 
-# Google Places API - from Cloud Console (can be same or different key)
-GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-
 # API timeout (increased for Gemini 3 preview models which can be slower)
 API_TIMEOUT = int(os.getenv("API_TIMEOUT", "240"))
 OPENAI_TIMEOUT = API_TIMEOUT  # Alias for llm_utils compatibility
@@ -76,14 +73,9 @@ EXPERT_TIMEOUT = int(os.getenv("EXPERT_TIMEOUT", "60"))  # Shorter timeout, then
 REASONING_MODEL = EXPERT_MODEL
 OPENAI_API_KEY = GEMINI_API_KEY  # Fallback for non-Gemini code paths
 
-# Google Search Grounding (for real-time info)
+# Google Search Grounding (for real-time market info)
 ENABLE_GOOGLE_SEARCH_GROUNDING = True
 GOOGLE_SEARCH_GROUNDING_THRESHOLD = 0.3
-
-# Google Maps Grounding (for hotel/restaurant/attraction data)
-# Uses Gemini 2.5 Flash for Maps grounding (required - Maps not available in Gemini 3)
-MAPS_GROUNDING_MODEL = os.getenv("MAPS_GROUNDING_MODEL", "gemini-2.5-flash")
-ENABLE_MAPS_GROUNDING = bool(GEMINI_API_KEY)
 
 # =============================================================================
 # STOCK API CONFIGURATION
@@ -107,27 +99,6 @@ MAX_IMAGE_SIZE_MB = 5
 # MCP Server Configuration
 MCP_SERVER_PORT = int(os.getenv("MCP_SERVER_PORT", "8080"))
 ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL", "60"))
-
-# =============================================================================
-# LEGACY TRAVEL API CONFIGURATION (Keep for compatibility)
-# =============================================================================
-
-# Amadeus Self-Service API (Flight, Hotel, Car Rental Search)
-AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
-AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
-AMADEUS_BASE_URL = "https://api.amadeus.com"
-ENABLE_FLIGHT_SEARCH = bool(AMADEUS_API_KEY and AMADEUS_API_SECRET)
-ENABLE_CAR_RENTAL = bool(AMADEUS_API_KEY and AMADEUS_API_SECRET)
-
-# OpenWeatherMap API
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/3.0"
-ENABLE_WEATHER_API = bool(OPENWEATHER_API_KEY)
-
-# Google Places API
-ENABLE_PLACES_API = bool(GOOGLE_PLACES_API_KEY)
-PLACES_CACHE_HOURS = 24
-PLACES_MIN_REVIEWS_TRUSTED = 100
 
 # =============================================================================
 # FEATURE FLAGS

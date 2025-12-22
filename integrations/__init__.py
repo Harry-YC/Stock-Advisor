@@ -1,25 +1,20 @@
 """
-External API Integrations for Travel Planner
+External API Integrations for Stock Advisor
 
 Modules:
-- weather: OpenWeatherMap API for weather forecasts
-- amadeus_flights: Amadeus API for flight search
-- amadeus_cars: Amadeus API for car rentals
-- google_places: Google Places API for ratings and reviews
-- google_search: Google Search/Maps grounding for hotel data
+- finnhub: Finnhub API for real-time stock data
+- gemini_vision: Gemini Vision for KOL screenshot OCR
+- market_search: Google Search grounding for market news
 """
 
-from integrations.weather import OpenWeatherClient
-from integrations.amadeus_flights import AmadeusClient
-from integrations.amadeus_cars import AmadeusCarClient
-from integrations.google_places import GooglePlacesClient
-from integrations.google_search import GoogleSearchClient, TravelGroundingClient
+from integrations.finnhub import FinnhubClient
+from integrations.gemini_vision import GeminiVisionClient, analyze_kol_screenshot
+from integrations.market_search import MarketSearchClient, search_stock_news
 
 __all__ = [
-    'OpenWeatherClient',
-    'AmadeusClient',
-    'AmadeusCarClient',
-    'GooglePlacesClient',
-    'GoogleSearchClient',
-    'TravelGroundingClient',
+    'FinnhubClient',
+    'GeminiVisionClient',
+    'analyze_kol_screenshot',
+    'MarketSearchClient',
+    'search_stock_news',
 ]
