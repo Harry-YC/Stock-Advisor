@@ -25,9 +25,15 @@ def _get_finnhub_client():
     if _finnhub_client is None:
         try:
             from integrations.finnhub import FinnhubClient
+            import os
+            logger.info(f"Creating FinnhubClient, FINNHUB_API_KEY set: {bool(os.getenv('FINNHUB_API_KEY'))}")
             _finnhub_client = FinnhubClient()
-        except ImportError:
-            logger.warning("Finnhub client not available")
+            logger.info(f"FinnhubClient created, is_available: {_finnhub_client.is_available()}")
+        except ImportError as e:
+            logger.warning(f"Finnhub client not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to create Finnhub client: {e}")
             return None
     return _finnhub_client
 
@@ -198,8 +204,11 @@ def fetch_stock_data(
     context = StockDataContext(symbol=symbol)
     used_fallback = False
 
+    logger.info(f"fetch_stock_data called for {symbol}")
+
     # Finnhub data (primary source)
     finnhub = _get_finnhub_client()
+    logger.info(f"Finnhub client: {finnhub}, available: {finnhub.is_available() if finnhub else 'N/A'}")
     if finnhub and finnhub.is_available():
         if include_quote:
             try:
