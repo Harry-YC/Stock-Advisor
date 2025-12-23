@@ -42,6 +42,25 @@ from services.kol_analyzer import KOLAnalyzer, analyze_kol_text
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Startup Diagnostics - Log API Key Status
+# =============================================================================
+
+def _log_api_status():
+    """Log API key configuration status at startup."""
+    keys = {
+        "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+        "FINNHUB_API_KEY": bool(os.getenv("FINNHUB_API_KEY")),
+        "ALPHA_VANTAGE_API_KEY": bool(os.getenv("ALPHA_VANTAGE_API_KEY")),
+    }
+    logger.info("=" * 50)
+    logger.info("API KEY STATUS AT STARTUP:")
+    for key, is_set in keys.items():
+        status = "✅ SET" if is_set else "❌ NOT SET"
+        logger.info(f"  {key}: {status}")
+    logger.info("=" * 50)
+
+_log_api_status()
 
 # =============================================================================
 # Input Validation & Sanitization
@@ -238,6 +257,7 @@ async def run_expert_panel(
     # Enable market search for real-time news via Google Search grounding
     evidence_context = ""
     if primary_ticker:
+        logger.info(f"Fetching stock data for {primary_ticker}...")
         stock_context = await asyncio.to_thread(
             fetch_stock_data,
             primary_ticker,
@@ -247,6 +267,8 @@ async def run_expert_panel(
             include_market_search=True,  # Real-time Google Search grounding
         )
         evidence_context = stock_context.to_prompt_context()
+        logger.info(f"Stock data fetched: {stock_context.data_available}")
+        logger.info(f"Evidence context length: {len(evidence_context)} chars")
 
     # Show progress message
     progress_msg = await cl.Message(
