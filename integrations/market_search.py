@@ -16,19 +16,12 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Model name mapping for native SDK
-MODEL_NAME_MAPPING = {
-    "gemini-3-pro-preview": "gemini-2.0-flash",
-    "gemini-3-pro": "gemini-2.0-flash",
-    "gemini-3-flash-preview": "gemini-2.0-flash",
-    "gemini-3-flash": "gemini-2.0-flash",
-}
+# Default model for market search
+DEFAULT_SEARCH_MODEL = "gemini-3-flash-preview"
 
 
 def _normalize_model_name(model_name: str) -> str:
-    """Normalize model name for native SDK."""
-    if model_name in MODEL_NAME_MAPPING:
-        return MODEL_NAME_MAPPING[model_name]
+    """Normalize model name - use as-is for Gemini 3 models."""
     return model_name
 
 
@@ -91,7 +84,7 @@ class MarketSearchClient:
     def is_available(self) -> bool:
         return bool(self.api_key)
 
-    def _get_model(self, model_name: str = "gemini-2.0-flash"):
+    def _get_model(self, model_name: str = "gemini-3-flash-preview"):
         """Get or initialize the generative model."""
         normalized_model = _normalize_model_name(model_name)
 
@@ -114,7 +107,7 @@ class MarketSearchClient:
         self,
         symbol: str,
         query: Optional[str] = None,
-        model_name: str = "gemini-2.0-flash"
+        model_name: str = "gemini-3-flash-preview"
     ) -> MarketSearchResult:
         """
         Search for recent news about a stock.
@@ -145,7 +138,7 @@ class MarketSearchClient:
     def search_market_sentiment(
         self,
         topic: str,
-        model_name: str = "gemini-2.0-flash"
+        model_name: str = "gemini-3-flash-preview"
     ) -> MarketSearchResult:
         """
         Search for market sentiment on a topic.
@@ -174,7 +167,7 @@ class MarketSearchClient:
     def search_analyst_ratings(
         self,
         symbol: str,
-        model_name: str = "gemini-2.0-flash"
+        model_name: str = "gemini-3-flash-preview"
     ) -> MarketSearchResult:
         """
         Search for analyst ratings and price targets.
@@ -203,7 +196,7 @@ class MarketSearchClient:
     def search_earnings_info(
         self,
         symbol: str,
-        model_name: str = "gemini-2.0-flash"
+        model_name: str = "gemini-3-flash-preview"
     ) -> MarketSearchResult:
         """
         Search for earnings information and estimates.
@@ -233,7 +226,7 @@ class MarketSearchClient:
         self,
         symbol: str,
         direction: str = "moved",  # "up", "down", "moved"
-        model_name: str = "gemini-2.0-flash"
+        model_name: str = "gemini-3-flash-preview"
     ) -> MarketSearchResult:
         """
         Search for reasons behind stock price movement.
@@ -270,7 +263,7 @@ class MarketSearchClient:
         self,
         query: str,
         system_context: str,
-        model_name: str = "gemini-2.0-flash"
+        model_name: str = "gemini-3-flash-preview"
     ) -> MarketSearchResult:
         """
         Internal method to search with Google grounding.

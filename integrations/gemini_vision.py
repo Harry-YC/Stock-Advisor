@@ -133,7 +133,7 @@ class GeminiVisionClient:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.api_key)
-                self._client = genai.GenerativeModel("gemini-2.0-flash")
+                self._client = genai.GenerativeModel("gemini-3-flash-preview")
             except ImportError:
                 logger.error("google-generativeai package not installed")
                 raise RuntimeError("google-generativeai package required for vision")
