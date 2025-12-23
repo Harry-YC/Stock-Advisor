@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Lazy-loaded clients
 _finnhub_client = None
+_alpha_vantage_client = None
 _market_search_client = None
 _vision_client = None
 
@@ -29,6 +30,19 @@ def _get_finnhub_client():
             logger.warning("Finnhub client not available")
             return None
     return _finnhub_client
+
+
+def _get_alpha_vantage_client():
+    """Lazy-load Alpha Vantage client (fallback)."""
+    global _alpha_vantage_client
+    if _alpha_vantage_client is None:
+        try:
+            from integrations.alpha_vantage import AlphaVantageClient
+            _alpha_vantage_client = AlphaVantageClient()
+        except ImportError:
+            logger.warning("Alpha Vantage client not available")
+            return None
+    return _alpha_vantage_client
 
 
 def _get_market_search_client():
@@ -167,6 +181,9 @@ def fetch_stock_data(
     """
     Fetch comprehensive stock data from all available sources.
 
+    Uses Finnhub as primary source, falls back to Alpha Vantage for
+    stocks not covered by Finnhub (e.g., micro-cap stocks).
+
     Args:
         symbol: Stock ticker symbol
         include_quote: Fetch real-time quote from Finnhub
@@ -179,8 +196,9 @@ def fetch_stock_data(
     """
     symbol = symbol.upper()
     context = StockDataContext(symbol=symbol)
+    used_fallback = False
 
-    # Finnhub data
+    # Finnhub data (primary source)
     finnhub = _get_finnhub_client()
     if finnhub and finnhub.is_available():
         if include_quote:
@@ -189,7 +207,8 @@ def fetch_stock_data(
                 if quote:
                     context.quote_summary = quote.format_summary()
                     context.data_available['quote'] = True
-                    logger.info(f"Fetched quote for {symbol}")
+                    context.data_available['quote_source'] = 'finnhub'
+                    logger.info(f"Fetched quote for {symbol} from Finnhub")
             except Exception as e:
                 logger.error(f"Quote fetch failed for {symbol}: {e}")
 
@@ -199,7 +218,8 @@ def fetch_stock_data(
                 if financials:
                     context.financials_summary = financials.format_summary()
                     context.data_available['financials'] = True
-                    logger.info(f"Fetched financials for {symbol}")
+                    context.data_available['financials_source'] = 'finnhub'
+                    logger.info(f"Fetched financials for {symbol} from Finnhub")
             except Exception as e:
                 logger.error(f"Financials fetch failed for {symbol}: {e}")
 
@@ -215,6 +235,40 @@ def fetch_stock_data(
     else:
         logger.warning("Finnhub client not available")
 
+    # Alpha Vantage fallback for missing data
+    alpha_vantage = _get_alpha_vantage_client()
+    if alpha_vantage and alpha_vantage.is_available():
+        # Fallback for quote if Finnhub didn't have it
+        if include_quote and not context.data_available.get('quote'):
+            try:
+                av_quote = alpha_vantage.get_quote(symbol)
+                if av_quote:
+                    context.quote_summary = av_quote.format_summary()
+                    context.data_available['quote'] = True
+                    context.data_available['quote_source'] = 'alpha_vantage'
+                    used_fallback = True
+                    logger.info(f"Fetched quote for {symbol} from Alpha Vantage (fallback)")
+            except Exception as e:
+                logger.error(f"Alpha Vantage quote fetch failed for {symbol}: {e}")
+
+        # Fallback for financials if Finnhub didn't have it
+        if include_financials and not context.data_available.get('financials'):
+            try:
+                av_overview = alpha_vantage.get_company_overview(symbol)
+                if av_overview:
+                    context.financials_summary = av_overview.format_summary()
+                    context.data_available['financials'] = True
+                    context.data_available['financials_source'] = 'alpha_vantage'
+                    used_fallback = True
+                    logger.info(f"Fetched financials for {symbol} from Alpha Vantage (fallback)")
+            except Exception as e:
+                logger.error(f"Alpha Vantage overview fetch failed for {symbol}: {e}")
+
+        if used_fallback:
+            logger.info(f"Used Alpha Vantage as fallback for {symbol} (Finnhub had no data)")
+    elif not context.data_available.get('quote'):
+        logger.warning(f"No quote data available for {symbol} - Finnhub empty and Alpha Vantage not configured")
+
     # Market search (Google grounding)
     if include_market_search:
         search_client = _get_market_search_client()
@@ -222,7 +276,11 @@ def fetch_stock_data(
             try:
                 result = search_client.search_stock_news(symbol)
                 if result.content:
-                    context.market_context = _sanitize_for_prompt(result.content, max_length=1000)
+                    context.market_context = _sanitize_for_prompt(result.content, max_length=800)
+                    # Inject sources for citation
+                    if hasattr(result, 'sources') and result.sources:
+                        sources_text = "\n\nSources:\n" + "\n".join(f"- {s}" for s in result.sources[:3])
+                        context.market_context += sources_text
                     context.data_available['market_search'] = True
                     logger.info(f"Fetched market context for {symbol}")
             except Exception as e:

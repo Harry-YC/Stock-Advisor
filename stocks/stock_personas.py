@@ -88,6 +88,11 @@ def get_stock_base_context():
         "- If market is closed, note that prices are from last session\n"
         "- For earnings: check if report was BMO (before open) or AMC (after close)\n"
         "- For news: distinguish between today's news vs older articles\n\n"
+        "NEWS USAGE RULES:\n"
+        "- Reference specific headlines with dates (e.g., 'Dec 23 Reuters reported...')\n"
+        "- Prioritize last 72 hours over older news\n"
+        "- If no recent news supports your view, explicitly say so\n"
+        "- Cite the source when available (e.g., 'per Bloomberg', 'via SEC filing')\n\n"
         "HANDLING DIFFERENT QUERY TYPES:\n"
         "- **Specific Stock**: When a ticker is provided, give detailed analysis\n"
         "- **General Questions**: Provide educational context and market principles\n"
@@ -443,6 +448,52 @@ STOCK_EXPERTS = {
             "ratio", "reward", "management", "diversify"
         ]
     },
+
+    # ========================================================================
+    # DEBATE MODERATOR (synthesis expert for debate mode)
+    # ========================================================================
+
+    "Debate Moderator": {
+        "model": "gemini-3-pro-preview",
+        "role": "Neutral Debate Synthesizer",
+        "specialty": "Cross-expert synthesis, consensus building, actionable conclusions",
+        "perspective": (
+            "You are the DEBATE MODERATOR. You do NOT have a personal view on the stock. "
+            "Your job is to synthesize the debate between the other experts into clear conclusions.\n\n"
+            "You must:\n"
+            "- Identify areas of CONSENSUS (where most experts agree)\n"
+            "- Highlight key DISAGREEMENTS (where experts conflict)\n"
+            "- Note which expert arguments were strongest/weakest\n"
+            "- Provide a BALANCED final assessment\n"
+            "- Give ACTIONABLE recommendations based on the debate\n\n"
+            "IMPORTANT: You are NEUTRAL. Do not favor bull or bear. Weigh evidence objectively. "
+            "Your value is in distilling the debate, not adding new opinions."
+        ),
+        "search_queries": [],
+        "topics": [
+            "DEBATE SYNTHESIS:",
+            "  - Summary of key points discussed",
+            "  - Evolution of arguments across rounds",
+            "CONSENSUS POINTS:",
+            "  - Areas where experts agreed",
+            "  - Strength of consensus (strong/moderate/weak)",
+            "KEY DISAGREEMENTS:",
+            "  - Main points of contention",
+            "  - Which side had stronger evidence",
+            "EXPERT PERFORMANCE:",
+            "  - Most compelling arguments",
+            "  - Weakest or unsupported claims",
+            "FINAL ASSESSMENT:",
+            "  - Overall verdict (Buy/Hold/Sell spectrum)",
+            "  - Confidence level based on debate quality",
+            "  - Key factors that would change this view",
+            "ACTIONABLE RECOMMENDATIONS:",
+            "  - For bulls: What to watch for",
+            "  - For bears: What to watch for",
+            "  - Risk management guidance"
+        ],
+        "specialty_keywords": []  # Not used for routing
+    },
 }
 
 # Expert emoji badges for visual identification
@@ -453,6 +504,7 @@ EXPERT_ICONS = {
     "Fundamental Analyst": "📊",
     "Sentiment Analyst": "📰",
     "Risk Manager": "🛡️",
+    "Debate Moderator": "⚖️",
 }
 
 # Bilingual expert names (English -> Traditional Chinese)
@@ -463,6 +515,7 @@ EXPERT_NAMES_ZH_TW = {
     "Fundamental Analyst": "基本面分析師",
     "Sentiment Analyst": "情緒分析師",
     "Risk Manager": "風險管理師",
+    "Debate Moderator": "辯論主持人",
 }
 
 # Bilingual expert names (English -> Simplified Chinese)
@@ -473,6 +526,7 @@ EXPERT_NAMES_ZH_CN = {
     "Fundamental Analyst": "基本面分析师",
     "Sentiment Analyst": "情绪分析师",
     "Risk Manager": "风险管理师",
+    "Debate Moderator": "辩论主持人",
 }
 
 # Expert Categories for UI grouping
@@ -488,7 +542,8 @@ STOCK_PRESETS = {
     "Quick Analysis": {
         "experts": ["Bull Analyst", "Bear Analyst", "Technical Analyst"],
         "focus": "Fast bull/bear overview with technical levels",
-        "description": "Get opposing views and key levels quickly"
+        "description": "Get opposing views and key levels quickly",
+        "use_quick_task": True,  # Use concise QUICK_TASK_TEMPLATE
     },
     "Deep Dive": {
         "experts": ["Bull Analyst", "Bear Analyst", "Technical Analyst", "Fundamental Analyst", "Risk Manager"],
@@ -511,10 +566,100 @@ STOCK_PRESETS = {
         "description": "Long-term fundamental analysis with risk awareness"
     },
     "Full Panel": {
-        "experts": list(STOCK_EXPERTS.keys()),
+        "experts": [e for e in STOCK_EXPERTS.keys() if e != "Debate Moderator"],
         "focus": "Complete multi-perspective analysis",
         "description": "Get insights from all 6 stock experts"
     },
+    "Expert Debate": {
+        "experts": [e for e in STOCK_EXPERTS.keys() if e != "Debate Moderator"],
+        "focus": "Multi-round expert debate with synthesis",
+        "description": "3 rounds of debate + moderator synthesis",
+        "is_debate_mode": True
+    },
+}
+
+
+# Debate round-specific prompts for Expert Debate mode
+DEBATE_ROUND_PROMPTS = {
+    "round_1": """
+## ROUND 1: INITIAL ANALYSIS
+
+Present your INITIAL position on this stock. Be clear and specific:
+- State your thesis upfront (bullish/bearish/neutral)
+- Support with evidence from the provided data
+- Include specific price levels or targets
+- Note key assumptions driving your view
+
+This is your opening statement. Be direct and substantive.
+""",
+
+    "round_2": """
+## ROUND 2: RESPOND TO OTHER EXPERTS
+
+You have seen other experts' initial analyses. You must:
+1. ACKNOWLEDGE specific points from other experts (name them)
+2. CHALLENGE arguments you disagree with - cite evidence
+3. REINFORCE your key points that weren't addressed
+4. CONCEDE if another expert made a valid point you missed
+
+FORMAT:
+- "I agree with [Expert] that..." (for valid points)
+- "I challenge [Expert]'s view on..." (with counter-evidence)
+- "My key point about X remains because..."
+
+Be specific. Reference actual numbers and claims from Round 1.
+""",
+
+    "round_3": """
+## ROUND 3: FINAL REBUTTALS & VERDICT
+
+This is your LAST word. You must:
+1. DEFEND your position against Round 2 criticisms
+2. Address the strongest counter-arguments
+3. State your FINAL VERDICT clearly
+4. Rate your CONFIDENCE (has the debate changed your conviction?)
+
+END WITH THIS FORMAT:
+---
+**FINAL VERDICT:** [BUY / HOLD / SELL]
+**Conviction:** [HIGH / MEDIUM / LOW]
+**Changed from Round 1:** [Yes - why / No - why]
+**Key condition that would change my view:** [specific condition]
+---
+""",
+
+    "synthesis": """
+## MODERATOR: DEBATE SYNTHESIS
+
+You are synthesizing a 3-round expert debate. Provide:
+
+1. **DEBATE EVOLUTION** - What changed from Round 1 to Round 3?
+   - Who conceded points? Who doubled down?
+   - Which arguments gained or lost strength?
+
+2. **CONSENSUS** - Where do experts actually agree?
+   - Strong consensus (4+ experts agree)
+   - Partial consensus (2-3 agree)
+
+3. **KEY DISAGREEMENTS** - Where do they fundamentally differ?
+   - Bull vs Bear: Who had stronger evidence?
+   - Technical vs Fundamental: Any contradictions?
+
+4. **EVIDENCE QUALITY** - Rate the debate quality
+   - Most compelling arguments (cite specific expert)
+   - Weakest or unsupported claims
+
+5. **FINAL ASSESSMENT**
+   - Overall verdict with confidence
+   - What would you recommend to different investor types?
+   - Key events/levels to watch
+
+6. **DEBATE SCORE** (1-10)
+   - How productive was this debate?
+   - Did experts engage with each other or talk past?
+
+Be objective. Weigh evidence, not personalities.
+"""
 }
 
 # Batch/Comparison Mode Instructions
@@ -547,6 +692,23 @@ IMPORTANT:
 - Consider both absolute and relative metrics
 """
 
+# Quick Mode Task Template - Concise, actionable responses
+QUICK_TASK_TEMPLATE = """
+Respond in MAX 12 bullets total. You MUST include:
+
+**VERDICT**: [BUY / HOLD / SELL] — Confidence: [High/Med/Low]
+**ENTRY**: $XXX | **STOP**: $XXX | **TARGET**: $XXX (or "No trade setup")
+
+**Top 3 Current Catalysts** (cite date/source if news provided):
+1. [Catalyst with date/source]
+2. [Catalyst with date/source]
+3. [Catalyst with date/source]
+
+**Key Risk**: One sentence describing the biggest risk to this thesis.
+
+Keep it brief. No fluff. Cite specific news headlines with dates when available.
+"""
+
 
 def get_comparison_prompt(symbols: List[str]) -> str:
     """
@@ -568,9 +730,12 @@ Please provide a comprehensive comparison analysis focusing on your area of expe
 """
 
 
-def get_stock_prompts(bullets_per_role: int = 10) -> Dict[str, Tuple[str, str]]:
+def get_stock_prompts(quick_mode: bool = False) -> Dict[str, Tuple[str, str]]:
     """
     Generate prompts for each stock expert.
+
+    Args:
+        quick_mode: If True, use concise QUICK_TASK_TEMPLATE for faster responses
 
     Returns:
         Dict mapping expert name to (context, task) tuple
@@ -582,28 +747,32 @@ def get_stock_prompts(bullets_per_role: int = 10) -> Dict[str, Tuple[str, str]]:
         context += f"Specialty: {config['specialty']}\n"
         context += f"Perspective: {config['perspective']}\n"
 
-        # Build task from topics
-        topics_str = "\n".join(f"- {topic}" for topic in config["topics"])
-        task = (
-            f"As the {config['role']}, provide comprehensive analysis "
-            f"covering these areas:\n{topics_str}\n\n"
-            "RESPONSE REQUIREMENTS:\n"
-            "- Provide DETAILED analysis with specific numbers when available\n"
-            "- Include specific price levels, ratios, and targets\n"
-            "- Explain your reasoning clearly\n"
-            "- Flag key risks and uncertainties\n"
-            "- Be objective - don't force a narrative if data doesn't support it\n"
-            "- Use confidence markers appropriately\n\n"
-            "ADVISORY FORMAT (include this section near the top):\n"
-            "Recommendation: Buy | Sell | Hold (or Wait)\n"
-            "Time Horizon: Short-term | Medium-term | Long-term\n"
-            "Timing Guidance: Entry/exit levels or conditions (if applicable)\n"
-            "Confidence: High | Medium | Low\n"
-            "Key Reasons:\n"
-            "- 2-4 bullet points\n"
-            "Key Risks:\n"
-            "- 2-3 bullet points"
-        )
+        # Use quick task template for concise responses, or detailed task
+        if quick_mode:
+            task = f"As the {config['role']}:\n\n{QUICK_TASK_TEMPLATE}"
+        else:
+            # Build detailed task from topics
+            topics_str = "\n".join(f"- {topic}" for topic in config["topics"])
+            task = (
+                f"As the {config['role']}, provide comprehensive analysis "
+                f"covering these areas:\n{topics_str}\n\n"
+                "RESPONSE REQUIREMENTS:\n"
+                "- Provide DETAILED analysis with specific numbers when available\n"
+                "- Include specific price levels, ratios, and targets\n"
+                "- Explain your reasoning clearly\n"
+                "- Flag key risks and uncertainties\n"
+                "- Be objective - don't force a narrative if data doesn't support it\n"
+                "- Use confidence markers appropriately\n\n"
+                "ADVISORY FORMAT (include this section near the top):\n"
+                "Recommendation: Buy | Sell | Hold (or Wait)\n"
+                "Time Horizon: Short-term | Medium-term | Long-term\n"
+                "Timing Guidance: Entry/exit levels or conditions (if applicable)\n"
+                "Confidence: High | Medium | Low\n"
+                "Key Reasons:\n"
+                "- 2-4 bullet points\n"
+                "Key Risks:\n"
+                "- 2-3 bullet points"
+            )
 
         prompts[name] = (context, task)
 
@@ -896,6 +1065,242 @@ def call_stock_expert_stream(
 
     except Exception as e:
         logger.error(f"Stream error for {persona_name}: {e}")
+        yield {'type': 'error', 'content': f"Error: {str(e)}"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model}
+
+
+def call_stock_expert_stream_with_round(
+    persona_name: str,
+    question: str,
+    evidence_context: str,
+    round_num: int,
+    previous_responses: Optional[Dict[str, str]] = None,
+    kol_context: Optional[str] = None,
+    model: str = None,
+    max_completion_tokens: int = None,
+):
+    """
+    Stream a stock expert response with debate-round-specific prompting.
+
+    This is designed for the Expert Debate mode where experts:
+    - Round 1: Give initial analysis
+    - Round 2: Respond to other experts
+    - Round 3: Final rebuttals and verdict
+
+    Args:
+        persona_name: Stock expert name
+        question: User's question about a stock
+        evidence_context: Market data context for the expert
+        round_num: Debate round (1, 2, or 3)
+        previous_responses: Dict of {expert_name: response} from previous rounds
+        kol_context: Optional KOL content
+        model: Model override
+        max_completion_tokens: Max tokens override
+
+    Yields:
+        Dict with type and content
+    """
+    import os
+    import logging
+    from config import settings
+
+    logger = logging.getLogger(__name__)
+
+    # Get API key
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        yield {'type': 'error', 'content': "Error: No API key configured"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model or 'unknown'}
+        return
+
+    # Get expert config
+    expert_info = STOCK_EXPERTS.get(persona_name, {})
+    if not expert_info:
+        yield {'type': 'error', 'content': f"Error: Unknown expert '{persona_name}'"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model or 'unknown'}
+        return
+
+    # Model selection
+    if not model:
+        model = expert_info.get("model") or getattr(settings, 'EXPERT_MODEL', 'gemini-3-pro-preview')
+
+    # Max tokens
+    if max_completion_tokens is None:
+        max_completion_tokens = getattr(settings, 'DEBATE_MAX_TOKENS', 4000)
+
+    # Get base prompts
+    prompts = get_stock_prompts()
+    if persona_name not in prompts:
+        yield {'type': 'error', 'content': f"Error: No prompts for '{persona_name}'"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model}
+        return
+
+    context, task = prompts[persona_name]
+
+    # Add round-specific instructions
+    round_key = f"round_{round_num}"
+    round_instruction = DEBATE_ROUND_PROMPTS.get(round_key, "")
+
+    system_prompt = context + "\n\n" + task
+    if round_instruction:
+        system_prompt += "\n\n" + round_instruction
+
+    # Add previous responses for rounds 2+
+    if previous_responses and round_num > 1:
+        prev_context = "\n\n## OTHER EXPERT ANALYSES FROM PREVIOUS ROUND(S):\n"
+        for expert, resp in previous_responses.items():
+            if expert != persona_name:
+                # Truncate to reasonable length
+                truncated = resp[:800] + "..." if len(resp) > 800 else resp
+                icon = EXPERT_ICONS.get(expert, "")
+                prev_context += f"\n### {icon} {expert}:\n{truncated}\n"
+        system_prompt += prev_context
+
+    # Build user message
+    user_message = f"Stock Analysis Request: {question}\n\nRound: {round_num} of 3"
+    if evidence_context:
+        user_message += f"\n\n## Market Data:\n{evidence_context}"
+    if kol_context:
+        user_message += f"\n\n## KOL Content:\n{kol_context}"
+
+    # Stream response
+    try:
+        from services.llm_router import get_llm_router
+
+        router = get_llm_router()
+        logger.info(f"Starting debate stream for {persona_name} (Round {round_num})")
+
+        chunk_count = 0
+        for chunk in router.call_expert_stream(
+            prompt=user_message,
+            system=system_prompt,
+            model=model,
+            max_tokens=max_completion_tokens
+        ):
+            if chunk.get('type') == 'chunk':
+                chunk_count += 1
+                yield chunk
+            elif chunk.get('type') == 'complete':
+                logger.info(f"Debate stream complete for {persona_name} R{round_num}: {chunk_count} chunks")
+                yield {
+                    'type': 'complete',
+                    'finish_reason': chunk.get('finish_reason', 'stop'),
+                    'model': model
+                }
+                return
+
+        yield {'type': 'complete', 'finish_reason': 'stop', 'model': model}
+
+    except Exception as e:
+        logger.error(f"Debate stream error for {persona_name} R{round_num}: {e}")
+        yield {'type': 'error', 'content': f"Error: {str(e)}"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model}
+
+
+def call_moderator_synthesis_stream(
+    question: str,
+    evidence_context: str,
+    all_rounds: list,
+    model: str = None,
+    max_completion_tokens: int = None,
+):
+    """
+    Stream the Debate Moderator's synthesis of all debate rounds.
+
+    Args:
+        question: Original question/stock
+        evidence_context: Stock data
+        all_rounds: List of dicts, each with {expert_name: response} for rounds 1-3
+        model: Model override
+        max_completion_tokens: Max tokens
+
+    Yields:
+        Dict with type and content
+    """
+    import os
+    import logging
+    from config import settings
+
+    logger = logging.getLogger(__name__)
+
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        yield {'type': 'error', 'content': "Error: No API key configured"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model or 'unknown'}
+        return
+
+    # Moderator uses Pro model for synthesis
+    if not model:
+        model = STOCK_EXPERTS.get("Debate Moderator", {}).get("model", "gemini-3-pro-preview")
+
+    if max_completion_tokens is None:
+        max_completion_tokens = getattr(settings, 'SYNTHESIS_MAX_TOKENS', 5000)
+
+    # Get moderator prompts
+    prompts = get_stock_prompts()
+    if "Debate Moderator" not in prompts:
+        yield {'type': 'error', 'content': "Error: Debate Moderator not configured"}
+        yield {'type': 'complete', 'finish_reason': 'error', 'model': model}
+        return
+
+    context, task = prompts["Debate Moderator"]
+    synthesis_instruction = DEBATE_ROUND_PROMPTS.get("synthesis", "")
+
+    system_prompt = context + "\n\n" + task
+    if synthesis_instruction:
+        system_prompt += "\n\n" + synthesis_instruction
+
+    # Build comprehensive debate transcript
+    debate_transcript = "## COMPLETE DEBATE TRANSCRIPT\n\n"
+
+    round_names = ["Initial Analysis", "Cross-Examination", "Final Rebuttals"]
+    for round_idx, round_responses in enumerate(all_rounds):
+        round_num = round_idx + 1
+        round_name = round_names[round_idx] if round_idx < len(round_names) else f"Round {round_num}"
+        debate_transcript += f"### ROUND {round_num}: {round_name}\n\n"
+
+        for expert, response in round_responses.items():
+            icon = EXPERT_ICONS.get(expert, "")
+            # Include more of Round 3 responses since they have final verdicts
+            max_len = 1200 if round_num == 3 else 600
+            truncated = response[:max_len] + "..." if len(response) > max_len else response
+            debate_transcript += f"**{icon} {expert}:**\n{truncated}\n\n"
+
+    # User message
+    user_message = f"Synthesize this expert debate on: {question}\n\n"
+    user_message += f"## Stock Data:\n{evidence_context}\n\n"
+    user_message += debate_transcript
+
+    # Stream
+    try:
+        from services.llm_router import get_llm_router
+
+        router = get_llm_router()
+        logger.info("Starting Moderator synthesis stream")
+
+        chunk_count = 0
+        for chunk in router.call_expert_stream(
+            prompt=user_message,
+            system=system_prompt,
+            model=model,
+            max_tokens=max_completion_tokens
+        ):
+            if chunk.get('type') == 'chunk':
+                chunk_count += 1
+                yield chunk
+            elif chunk.get('type') == 'complete':
+                logger.info(f"Moderator synthesis complete: {chunk_count} chunks")
+                yield {
+                    'type': 'complete',
+                    'finish_reason': chunk.get('finish_reason', 'stop'),
+                    'model': model
+                }
+                return
+
+        yield {'type': 'complete', 'finish_reason': 'stop', 'model': model}
+
+    except Exception as e:
+        logger.error(f"Moderator synthesis error: {e}")
         yield {'type': 'error', 'content': f"Error: {str(e)}"}
         yield {'type': 'complete', 'finish_reason': 'error', 'model': model}
 

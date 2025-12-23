@@ -26,6 +26,7 @@ Your AI-powered stock analysis assistant with 6 expert perspectives.
    - KOL Review / KOL 評估
    - Trade Planning / 交易規劃
    - Full Panel / 全體專家
+   - **Expert Debate 🔥 / 專家辯論** - Multi-round debate with synthesis / 多輪辯論加總結
 
 ---
 
@@ -39,6 +40,7 @@ Your AI-powered stock analysis assistant with 6 expert perspectives.
 | 📊 Fundamental Analyst / 基本面分析師 | Financials, valuation metrics / 財務數據、估值指標 |
 | 📰 Sentiment Analyst / 情緒分析師 | News sentiment, KOL analysis / 新聞情緒、KOL 分析 |
 | 🛡️ Risk Manager / 風險管理師 | Position sizing, hedging / 部位管理、避險策略 |
+| ⚖️ Debate Moderator / 辯論主持人 | Synthesis, consensus building / 綜合分析、共識建立 |
 
 ---
 

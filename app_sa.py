@@ -23,9 +23,12 @@ from stocks.stock_personas import (
     STOCK_EXPERTS,
     STOCK_PRESETS,
     EXPERT_ICONS,
+    DEBATE_ROUND_PROMPTS,
     get_default_stock_experts,
     call_stock_expert,
     call_stock_expert_stream,
+    call_stock_expert_stream_with_round,
+    call_moderator_synthesis_stream,
     detect_best_stock_expert,
 )
 from services.stock_data_service import (
@@ -178,6 +181,42 @@ Return ONLY JSON."""
         return {"tickers": [], "question_type": "general", "specific_question": user_message}
 
 
+def get_intent_based_experts(question: str, base_experts: List[str]) -> List[str]:
+    """
+    Dynamically add experts based on question intent.
+
+    Args:
+        question: User's question text
+        base_experts: Default expert list from preset
+
+    Returns:
+        Updated expert list with intent-based additions
+    """
+    question_lower = question.lower()
+    experts = list(base_experts)  # Copy to avoid mutation
+
+    # Intent patterns -> additional experts
+    intent_rules = [
+        # Buy/sell/hold questions → add Risk Manager
+        (["should i buy", "should i sell", "is it a buy", "buy or sell", "hold or sell"],
+         "Risk Manager"),
+        # Valuation/long-term → add Fundamental Analyst
+        (["valuation", "long-term", "long term", "intrinsic value", "fair value", "undervalued", "overvalued"],
+         "Fundamental Analyst"),
+        # Today/movement questions → add Sentiment Analyst
+        (["today", "fell", "rose", "dropped", "jumped", "why did", "what happened", "news"],
+         "Sentiment Analyst"),
+    ]
+
+    for patterns, expert in intent_rules:
+        if any(p in question_lower for p in patterns):
+            if expert not in experts:
+                experts.append(expert)
+                logger.info(f"Intent-based addition: Added {expert} based on question keywords")
+
+    return experts
+
+
 async def run_expert_panel(
     question: str,
     tickers: List[str],
@@ -187,7 +226,10 @@ async def run_expert_panel(
     """Run expert panel analysis on stocks."""
     logger.info(f"Running expert panel: preset={preset}, tickers={tickers}")
     preset_config = STOCK_PRESETS.get(preset, STOCK_PRESETS["Quick Analysis"])
-    expert_names = preset_config["experts"]
+    base_experts = preset_config["experts"]
+
+    # Apply intent-based expert additions
+    expert_names = get_intent_based_experts(question, base_experts)
 
     responses = {}
     primary_ticker = tickers[0] if tickers else None
@@ -351,6 +393,261 @@ async def display_expert_responses(responses: Dict[str, str], question: str):
     await cl.Message(
         content="---\n*Ask a follow-up question or request a deep dive analysis.*",
         actions=actions
+    ).send()
+
+
+# =============================================================================
+# Expert Debate Mode
+# =============================================================================
+
+async def stream_expert_response_with_round(
+    expert_name: str,
+    question: str,
+    evidence_context: str,
+    round_num: int,
+    previous_responses: Dict[str, str] = None,
+    kol_context: str = ""
+):
+    """Async wrapper for streaming debate-round expert responses."""
+    import queue
+    import threading
+
+    result_queue = queue.Queue()
+    error_holder = [None]
+
+    def run_sync_generator():
+        try:
+            for chunk in call_stock_expert_stream_with_round(
+                persona_name=expert_name,
+                question=question,
+                evidence_context=evidence_context,
+                round_num=round_num,
+                previous_responses=previous_responses,
+                kol_context=kol_context
+            ):
+                result_queue.put(chunk)
+            result_queue.put(None)
+        except Exception as e:
+            error_holder[0] = e
+            result_queue.put(None)
+
+    thread = threading.Thread(target=run_sync_generator, daemon=True)
+    thread.start()
+
+    while True:
+        try:
+            chunk = await asyncio.to_thread(result_queue.get, timeout=0.1)
+        except:
+            await asyncio.sleep(0.05)
+            continue
+
+        if chunk is None:
+            if error_holder[0]:
+                logger.error(f"Debate stream error: {error_holder[0]}")
+            break
+
+        if chunk.get("type") == "chunk":
+            yield chunk.get("content", "")
+
+
+async def stream_moderator_synthesis(
+    question: str,
+    evidence_context: str,
+    all_rounds: list
+):
+    """Async wrapper for streaming moderator synthesis."""
+    import queue
+    import threading
+
+    result_queue = queue.Queue()
+    error_holder = [None]
+
+    def run_sync_generator():
+        try:
+            for chunk in call_moderator_synthesis_stream(
+                question=question,
+                evidence_context=evidence_context,
+                all_rounds=all_rounds
+            ):
+                result_queue.put(chunk)
+            result_queue.put(None)
+        except Exception as e:
+            error_holder[0] = e
+            result_queue.put(None)
+
+    thread = threading.Thread(target=run_sync_generator, daemon=True)
+    thread.start()
+
+    while True:
+        try:
+            chunk = await asyncio.to_thread(result_queue.get, timeout=0.1)
+        except:
+            await asyncio.sleep(0.05)
+            continue
+
+        if chunk is None:
+            if error_holder[0]:
+                logger.error(f"Synthesis stream error: {error_holder[0]}")
+            break
+
+        if chunk.get("type") == "chunk":
+            yield chunk.get("content", "")
+
+
+async def run_expert_debate(
+    question: str,
+    tickers: List[str],
+    kol_context: str = ""
+) -> Dict:
+    """
+    Run full 4-round expert debate (3 debate rounds + moderator synthesis).
+
+    Returns dict with all rounds and synthesis.
+    """
+    logger.info(f"Starting Expert Debate for tickers={tickers}")
+
+    # Get debate experts (all except Moderator)
+    debate_experts = [e for e in STOCK_EXPERTS.keys() if e != "Debate Moderator"]
+    primary_ticker = tickers[0] if tickers else None
+
+    # Fetch stock data once for all rounds
+    evidence_context = ""
+    if primary_ticker:
+        stock_context = await asyncio.to_thread(
+            fetch_stock_data,
+            primary_ticker,
+            include_quote=True,
+            include_financials=True,
+            include_news=True,
+            include_market_search=True,
+        )
+        evidence_context = stock_context.to_prompt_context()
+
+    all_rounds = []
+
+    # Helper to run one debate round
+    async def run_debate_round(round_num: int, previous_responses: Dict[str, str] = None):
+        round_names = {1: "Initial Analysis", 2: "Cross-Examination", 3: "Final Verdicts"}
+        round_emojis = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣"}
+
+        # Show round header
+        await cl.Message(
+            content=f"## {round_emojis[round_num]} Round {round_num}: {round_names[round_num]}\n"
+                    f"*Consulting {len(debate_experts)} experts...*"
+        ).send()
+
+        async def call_expert(expert_name: str):
+            try:
+                full_response = ""
+                async for chunk in stream_expert_response_with_round(
+                    expert_name=expert_name,
+                    question=question,
+                    evidence_context=evidence_context,
+                    round_num=round_num,
+                    previous_responses=previous_responses,
+                    kol_context=kol_context
+                ):
+                    full_response += chunk
+                return expert_name, full_response, True
+            except Exception as e:
+                logger.error(f"Debate expert {expert_name} R{round_num} failed: {e}")
+                return expert_name, f"*Analysis unavailable*", False
+
+        # Run all experts in parallel
+        tasks = [call_expert(name) for name in debate_experts]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        round_responses = {}
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+            expert_name, response, success = result
+            round_responses[expert_name] = response
+            if success:
+                logger.info(f"Debate R{round_num} {expert_name}: {len(response)} chars")
+
+        return round_responses
+
+    # ROUND 1: Initial Analysis
+    round1 = await run_debate_round(1)
+    all_rounds.append(round1)
+    await display_debate_round(1, round1)
+
+    # ROUND 2: Cross-Examination
+    round2 = await run_debate_round(2, round1)
+    all_rounds.append(round2)
+    await display_debate_round(2, round2)
+
+    # ROUND 3: Final Rebuttals
+    # Combine R1 + R2 for context
+    combined_prev = {}
+    for expert in debate_experts:
+        r1_text = round1.get(expert, "")[:400]
+        r2_text = round2.get(expert, "")[:400]
+        combined_prev[expert] = f"[R1] {r1_text}...\n[R2] {r2_text}..."
+    round3 = await run_debate_round(3, combined_prev)
+    all_rounds.append(round3)
+    await display_debate_round(3, round3)
+
+    # ROUND 4: Moderator Synthesis
+    await cl.Message(content="## ⚖️ Moderator Synthesis\n*Analyzing debate transcript...*").send()
+
+    synthesis_text = ""
+    async for chunk in stream_moderator_synthesis(question, evidence_context, all_rounds):
+        synthesis_text += chunk
+
+    await display_synthesis(synthesis_text, tickers)
+
+    # Store debate for reference
+    cl.user_session.set("last_debate", {
+        "rounds": all_rounds,
+        "synthesis": synthesis_text,
+        "tickers": tickers,
+        "question": question
+    })
+
+    return {"rounds": all_rounds, "synthesis": synthesis_text}
+
+
+async def display_debate_round(round_num: int, responses: Dict[str, str]):
+    """Display one debate round's responses."""
+    for expert_name, response in responses.items():
+        if not response or response == "*Analysis unavailable*":
+            continue
+        icon = EXPERT_ICONS.get(expert_name, "📊")
+
+        # Truncate for display if too long (full version stored)
+        display_response = response
+        if len(response) > 3000:
+            display_response = response[:3000] + "\n\n*[Response truncated for display]*"
+
+        await cl.Message(
+            content=f"### {icon} {expert_name}\n\n{display_response}"
+        ).send()
+
+
+async def display_synthesis(synthesis: str, tickers: List[str]):
+    """Display moderator synthesis with action buttons."""
+    await cl.Message(content=f"### ⚖️ Debate Moderator\n\n{synthesis}").send()
+
+    # Offer follow-up actions
+    ticker_label = tickers[0] if tickers else "stock"
+    actions = [
+        cl.Action(name="debate_new", label="🔄 New Debate", value="new", payload={}),
+        cl.Action(name="ask_followup", label="💬 Ask Follow-up", value="followup", payload={}),
+    ]
+
+    await cl.Message(
+        content=f"---\n*Debate complete for {ticker_label}.*",
+        actions=actions
+    ).send()
+
+
+@cl.action_callback("debate_new")
+async def on_debate_new(action: cl.Action):
+    """Start a new debate."""
+    await cl.Message(
+        content="Ready for a new debate! Enter a stock ticker or question."
     ).send()
 
 
@@ -802,22 +1099,29 @@ async def on_settings_update(settings_dict: Dict):
 
     # Always persist the preset selection
     cl.user_session.set("current_preset", preset)
-    logger.info(f"Preset updated: {preset}")
+
+    # Check if this is debate mode
+    preset_config = STOCK_PRESETS.get(preset, {})
+    is_debate = preset_config.get("is_debate_mode", False)
+    cl.user_session.set("is_debate_mode", is_debate)
+    logger.info(f"Preset updated: {preset}, debate_mode={is_debate}")
 
     if ticker:
         is_valid, validated = validate_ticker(ticker)
         if is_valid:
             cl.user_session.set("detected_tickers", [validated])
+            mode_label = "Expert Debate 🔥" if is_debate else preset
             await cl.Message(
-                content=f"Settings updated: **{validated}** with {preset} preset"
+                content=f"Settings updated: **{validated}** with {mode_label} preset"
             ).send()
         else:
             await cl.Message(
                 content=f"Invalid ticker '{ticker}'. Please use 1-5 letters (e.g., NVDA, AAPL)."
             ).send()
     else:
+        mode_label = "Expert Debate 🔥" if is_debate else preset
         await cl.Message(
-            content=f"Expert panel updated: **{preset}**"
+            content=f"Expert panel updated: **{mode_label}**"
         ).send()
 
 
@@ -889,21 +1193,37 @@ async def on_message(message: cl.Message):
         await display_expert_responses(responses, user_input)
 
     elif tickers:
-        # Stock analysis with expert panel
+        # Check if debate mode is enabled
+        is_debate_mode = cl.user_session.get("is_debate_mode", False)
         preset = cl.user_session.get("current_preset", "Quick Analysis")
-        logger.info(f"Starting expert panel for tickers={tickers}, preset={preset}")
-        try:
-            responses = await run_expert_panel(
-                question=user_input,
-                tickers=tickers,
-                preset=preset
-            )
-            logger.info(f"run_expert_panel returned {len(responses)} responses")
-            await display_expert_responses(responses, user_input)
-            logger.info("display_expert_responses completed")
-        except Exception as e:
-            logger.error(f"Expert panel failed: {e}", exc_info=True)
-            await cl.Message(content=f"**Error:** Analysis failed - {e}").send()
+
+        if is_debate_mode:
+            # Run Expert Debate (3 rounds + synthesis)
+            logger.info(f"Starting Expert Debate for tickers={tickers}")
+            try:
+                await run_expert_debate(
+                    question=user_input,
+                    tickers=tickers
+                )
+                logger.info("Expert Debate completed")
+            except Exception as e:
+                logger.error(f"Expert Debate failed: {e}", exc_info=True)
+                await cl.Message(content=f"**Error:** Debate failed - {e}").send()
+        else:
+            # Standard expert panel analysis
+            logger.info(f"Starting expert panel for tickers={tickers}, preset={preset}")
+            try:
+                responses = await run_expert_panel(
+                    question=user_input,
+                    tickers=tickers,
+                    preset=preset
+                )
+                logger.info(f"run_expert_panel returned {len(responses)} responses")
+                await display_expert_responses(responses, user_input)
+                logger.info("display_expert_responses completed")
+            except Exception as e:
+                logger.error(f"Expert panel failed: {e}", exc_info=True)
+                await cl.Message(content=f"**Error:** Analysis failed - {e}").send()
 
     else:
         # General question without specific tickers

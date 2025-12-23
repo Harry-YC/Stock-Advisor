@@ -78,6 +78,17 @@ ENABLE_GOOGLE_SEARCH_GROUNDING = True
 GOOGLE_SEARCH_GROUNDING_THRESHOLD = 0.3
 
 # =============================================================================
+# EXPERT DEBATE MODE CONFIGURATION
+# =============================================================================
+
+ENABLE_DEBATE_MODE = True
+DEBATE_ROUNDS = 3  # Number of debate rounds before synthesis
+DEBATE_MAX_TOKENS = int(os.getenv("DEBATE_MAX_TOKENS", "4000"))  # Per expert per round
+SYNTHESIS_MAX_TOKENS = int(os.getenv("SYNTHESIS_MAX_TOKENS", "5000"))  # Moderator
+DEBATE_EXPERT_TIMEOUT = int(os.getenv("DEBATE_EXPERT_TIMEOUT", "60"))  # Per expert
+MODERATOR_MODEL = os.getenv("MODERATOR_MODEL", "gemini-3-pro-preview")
+
+# =============================================================================
 # STOCK API CONFIGURATION
 # =============================================================================
 
@@ -86,6 +97,11 @@ GOOGLE_SEARCH_GROUNDING_THRESHOLD = 0.3
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
 ENABLE_FINNHUB = bool(FINNHUB_API_KEY)
+
+# Alpha Vantage API (Fallback for stocks not in Finnhub)
+# Register free at: https://www.alphavantage.co/ (25 calls/day free)
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+ENABLE_ALPHA_VANTAGE = bool(ALPHA_VANTAGE_API_KEY)
 
 # Cache TTLs (seconds)
 QUOTE_CACHE_TTL = 300  # 5 minutes for real-time quotes
