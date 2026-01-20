@@ -300,7 +300,7 @@ class FinnhubClient:
     PROFILE_CACHE_TTL = 7200  # 1 hour
     FINANCIALS_CACHE_TTL = 7200  # 1 hour
     NEWS_CACHE_TTL = 1200  # 15 minutes
-    CANDLE_CACHE_TTL = 3600  # 1 hour for daily candles
+    CANDLE_CACHE_TTL = 7200  # 1 hour for daily candles
     EARNINGS_CACHE_TTL = 86400  # 1 day for earnings calendar
 
     def __init__(self, api_key: Optional[str] = None):
