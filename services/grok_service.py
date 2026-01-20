@@ -403,6 +403,7 @@ class GrokInsightResult:
 class GrokService:
     """
     Service for fetching real-time KOL insights from X via xAI's Grok API.
+    Supports mock mode for testing without API key.
     """
 
     def __init__(
@@ -410,7 +411,8 @@ class GrokService:
         api_key: Optional[str] = None,
         model: str = "default",
         max_retries: int = 3,
-        timeout: int = 60
+        timeout: int = 60,
+        mock_mode: bool = False
     ):
         self.api_key = api_key or os.getenv("XAI_API_KEY")
         self.base_url = "https://api.x.ai/v1"
@@ -421,15 +423,118 @@ class GrokService:
         self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "3600"))  # 1 hour cache
         self._cache_file = os.path.join(os.getcwd(), ".grok_cache_stock.json")
 
+        # Mock mode for testing without API
+        self.mock_mode = mock_mode or os.getenv("GROK_MOCK_MODE", "").lower() == "true"
+
         # Load cache from disk
         self._load_cache()
 
-        if not self.api_key:
+        if not self.api_key and not self.mock_mode:
             logger.warning("No XAI_API_KEY provided or found in environment.")
 
     def is_available(self) -> bool:
-        """Check if service is available."""
-        return bool(self.api_key)
+        """Check if service is available (API key set or mock mode)."""
+        return bool(self.api_key) or self.mock_mode
+
+    def _get_mock_response(self, topic: str, response_type: str = "general") -> str:
+        """Generate mock response for testing without API."""
+        mock_responses = {
+            "institutional_flow": f"""## Key Findings
+**Institutional Activity on {topic}:**
+
+### Notable Moves
+- **Michael Burry** (@michaeljburry): Increased position by 15% based on latest 13F filing
+- **Bill Ackman** (@BillAckman): "We remain bullish on {topic} - strong fundamentals"
+- **Cathie Wood** (@CathieDWood): ARK added shares across multiple funds
+
+### Sentiment Snapshot
+- Institutional: **Bullish** (65% buying vs 35% selling)
+- Smart Money Flow: Net positive $2.3B in Q4
+- Hedge Fund Positioning: Above average
+
+## Trading Implications
+- Watch for continuation if institutional buying persists
+- Key support at 50-day MA
+
+*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*""",
+
+            "options_sentiment": f"""## Options Flow Analysis for {topic}
+
+### Unusual Activity Detected
+- **SpotGamma** (@spotgamma): "GEX flipping positive - dealer hedging pressure easing"
+- **Unusual Whales** (@unusual_whales): Large call sweeps detected at +5% OTM strikes
+- **Cheddar Flow** (@CheddarFlow): Premium flow skewed 70/30 calls vs puts
+
+### Key Levels
+- Put Wall: $150
+- Call Wall: $180
+- Max Pain: $165
+
+### Sentiment
+- Options Market: **Bullish**
+- Put/Call Ratio: 0.65 (below average = bullish)
+- IV Rank: 45%
+
+## Trading Implications
+- Gamma squeeze potential above $175
+- Support from dealer hedging at current levels
+
+*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*""",
+
+            "synthesis": f"""# {topic} - Multi-Perspective KOL Analysis
+
+## 🐂 Bull Case
+**Who's Bullish:**
+- **Cathie Wood** (@CathieDWood): "Innovation leader with 5-year CAGR potential of 25%"
+- **Dan Ives** (@DivesTech): "$250 price target - AI tailwinds underappreciated"
+- **Tom Lee** (@fundstrat): "Risk/reward attractive at current levels"
+
+**Main Bull Arguments:**
+1. Strong revenue growth trajectory
+2. Market leadership in key segments
+3. Multiple expansion potential
+
+## 🐻 Bear Case
+**Who's Bearish:**
+- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F
+- **Jesse Felder** (@jessefelder): "Valuation stretched vs historical norms"
+
+**Main Bear Arguments:**
+1. Premium valuation leaves little margin for error
+2. Competition intensifying
+3. Macro headwinds (rates, growth)
+
+## 📊 Sentiment Gauge
+- Institutional: **Bullish**
+- Retail: **Very Bullish**
+- Options Market: **Bullish**
+- Overall: **Bullish with caution**
+
+## 🎯 Synthesis
+**Consensus:** Cautiously bullish with debate on valuation
+**Key Debate:** Growth sustainability vs multiple compression
+**Contrarian View:** Bears argue mean reversion inevitable
+
+*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*""",
+
+            "general": f"""## Market Pulse: {topic}
+
+### Key Narratives
+- **Josh Brown** (@ReformedBroker): "Market structure remains supportive"
+- **Joe Weisenthal** (@TheStalwart): "Economic data continues to surprise"
+- **Kyla Scanlon** (@kaborost): "Vibes improving but watch credit spreads"
+
+### Sentiment Snapshot
+- Overall: **Constructive**
+- Key debates ongoing
+- Watch for catalyst events
+
+## Notable Voices
+Multiple perspectives captured from finance Twitter.
+
+*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*"""
+        }
+        return mock_responses.get(response_type, mock_responses["general"])
 
     def _load_cache(self):
         """Load cache from disk."""
@@ -569,6 +674,11 @@ class GrokService:
         Returns:
             Formatted KOL insights string
         """
+        # Mock mode for testing
+        if self.mock_mode:
+            logger.info(f"Mock mode: Returning mock KOL insights for {topic}")
+            return self._get_mock_response(topic, "general")
+
         if not self.api_key:
             return "No xAI API Key provided. Add XAI_API_KEY to enable X/Twitter sentiment."
 
@@ -704,6 +814,9 @@ Rules:
         """
         Get trading sentiment for a specific stock ticker.
         """
+        if self.mock_mode:
+            return self._get_mock_response(symbol, "general")
+
         if not self.api_key:
             return "No API key"
 
@@ -788,6 +901,12 @@ Be specific and cite sources."""
         Returns:
             Formatted competitive intelligence findings
         """
+        # Mock mode for testing
+        if self.mock_mode:
+            logger.info(f"Mock mode: Returning mock CI for {dimension}")
+            mock_type = dimension if dimension in ["institutional_flow", "options_sentiment"] else "general"
+            return self._get_mock_response(context or dimension, mock_type)
+
         if not self.api_key:
             return ""
 
@@ -1108,6 +1227,11 @@ Include @handles and approximate dates for all quotes."""
         Returns:
             Synthesized multi-perspective analysis
         """
+        # Mock mode for testing
+        if self.mock_mode:
+            logger.info(f"Mock mode: Returning mock synthesis for {symbol}")
+            return self._get_mock_response(symbol, "synthesis")
+
         if not self.api_key:
             return ""
 
@@ -1241,6 +1365,11 @@ Be honest about what you can and cannot find."""
         Returns:
             Comprehensive research report with KOL insights
         """
+        # Mock mode for testing
+        if self.mock_mode:
+            logger.info(f"Mock mode: Returning mock deep research for {symbol}")
+            return self._get_mock_response(symbol, "synthesis")
+
         if not self.api_key:
             return "Deep research requires XAI_API_KEY to access X/Twitter data."
 
