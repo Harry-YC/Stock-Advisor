@@ -783,7 +783,7 @@ Rules:
             ],
             "model": self.model,
             "stream": False,
-            "temperature": 0.4,
+            "temperature": 0.35,
             "max_tokens": 2500
         }
 
