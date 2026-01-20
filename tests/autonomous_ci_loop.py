@@ -433,26 +433,26 @@ FALLBACK_IMPROVEMENTS = [
     {
         "file": "services/grok_service.py",
         "description": "Increase Grok API timeout for reliability",
-        "old_code": "timeout=60",
-        "new_code": "timeout=90",
+        "old_code": "timeout: int = 60,",
+        "new_code": "timeout: int = 90,",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase cache TTL for better performance",
-        "old_code": "CACHE_TTL = 3600",
-        "new_code": "CACHE_TTL = 7200",
+        "description": "Increase Grok cache TTL for better performance",
+        "old_code": 'GROK_CACHE_TTL", "3600"',
+        "new_code": 'GROK_CACHE_TTL", "7200"',
     },
     {
-        "file": "integrations/market_search.py",
-        "description": "Increase market search timeout",
-        "old_code": "timeout=30",
-        "new_code": "timeout=45",
-    },
-    {
-        "file": "services/stock_data_service.py",
-        "description": "Increase quote cache duration",
+        "file": "integrations/finnhub.py",
+        "description": "Increase Finnhub quote cache duration",
         "old_code": "QUOTE_CACHE_TTL = 300",
         "new_code": "QUOTE_CACHE_TTL = 600",
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase Finnhub financials cache duration",
+        "old_code": "FINANCIALS_CACHE_TTL = 3600",
+        "new_code": "FINANCIALS_CACHE_TTL = 7200",
     },
 ]
 

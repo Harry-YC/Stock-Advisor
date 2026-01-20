@@ -535,7 +535,7 @@ git checkout .
 
 ## Stock Advisor Improvement Loop (RECOMMENDED)
 
-Run the continuous CI improvement loop:
+Run the continuous improvement loop:
 
 ```bash
 # Run 10 iterations
