@@ -299,7 +299,7 @@ class FinnhubClient:
     QUOTE_CACHE_TTL = 900  # 5 minutes
     PROFILE_CACHE_TTL = 7200  # 1 hour
     FINANCIALS_CACHE_TTL = 7200  # 1 hour
-    NEWS_CACHE_TTL = 1200  # 15 minutes
+    NEWS_CACHE_TTL = 1500  # 15 minutes
     CANDLE_CACHE_TTL = 7200  # 1 hour for daily candles
     EARNINGS_CACHE_TTL = 172800  # 1 day for earnings calendar
 
