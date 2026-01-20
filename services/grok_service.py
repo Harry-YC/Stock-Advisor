@@ -1337,7 +1337,7 @@ Be honest about what you can and cannot find."""
             ],
             "model": self.model,
             "temperature": 0.3,
-            "max_tokens": 2500
+            "max_tokens": 2800
         }
 
         try:
