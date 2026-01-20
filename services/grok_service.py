@@ -784,7 +784,7 @@ Rules:
             "model": self.model,
             "stream": False,
             "temperature": 0.35,
-            "max_tokens": 2500
+            "max_tokens": 2800
         }
 
         try:
