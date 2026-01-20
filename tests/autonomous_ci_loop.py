@@ -157,29 +157,124 @@ def run_market_search(symbol: str) -> dict:
 
 
 def synthesize_insights(grok_results: list, market_results: list) -> str:
-    """Synthesize all gathered insights."""
-    synthesis = "## Gathered Intelligence\n\n"
-
+    """Synthesize all gathered insights into a comprehensive report."""
+    # Group by symbol
+    symbols = set()
     for g in grok_results:
-        if g.get("success"):
-            synthesis += f"### {g['symbol']} - KOL Insights\n"
-            synthesis += f"Dimensions: {g.get('dimensions', [])}\n"
-            synthesis += f"Latency: {g.get('latency_ms', 0)}ms\n"
-            synthesis += f"{g.get('content', '')[:500]}\n\n"
-
+        symbols.add(g.get("symbol", "UNKNOWN"))
     for m in market_results:
-        if m.get("success"):
-            synthesis += f"### {m['symbol']} - Market News\n"
-            synthesis += f"Sources: {m.get('sources', 0)}, Sentiment: {m.get('sentiment', 'unknown')}\n"
-            synthesis += f"{m.get('content', '')[:300]}\n\n"
+        symbols.add(m.get("symbol", "UNKNOWN"))
+
+    synthesis = "## Stock Intelligence Report\n\n"
+
+    # Summary stats
+    grok_success = sum(1 for g in grok_results if g.get("success"))
+    market_success = sum(1 for m in market_results if m.get("success"))
+    total_sources = sum(m.get("sources", 0) for m in market_results)
+
+    synthesis += f"**Coverage:** {len(symbols)} stocks | {grok_success} KOL queries | {market_success} market searches | {total_sources} news sources\n\n"
+
+    # Sentiment summary
+    sentiments = [m.get("sentiment", "unknown") for m in market_results if m.get("success")]
+    bullish = sentiments.count("bullish")
+    bearish = sentiments.count("bearish")
+    mixed = sentiments.count("mixed")
+    synthesis += f"**Overall Sentiment:** 🟢 Bullish: {bullish} | 🔴 Bearish: {bearish} | ⚪ Mixed: {mixed}\n\n"
+
+    synthesis += "---\n\n"
+
+    # Detailed by symbol
+    for symbol in sorted(symbols):
+        synthesis += f"### {symbol}\n\n"
+
+        # KOL Insights for this symbol
+        symbol_grok = [g for g in grok_results if g.get("symbol") == symbol and g.get("success")]
+        if symbol_grok:
+            synthesis += "**KOL Insights:**\n"
+            for g in symbol_grok:
+                dims = g.get("dimensions", [])
+                dim_str = f" [{', '.join(dims)}]" if dims else ""
+                synthesis += f"- {dim_str} {g.get('content', '')[:400]}...\n"
+            synthesis += "\n"
+
+        # Market News for this symbol
+        symbol_market = [m for m in market_results if m.get("symbol") == symbol and m.get("success")]
+        if symbol_market:
+            synthesis += "**Market News:**\n"
+            for m in symbol_market:
+                sentiment_emoji = {"bullish": "🟢", "bearish": "🔴", "mixed": "⚪"}.get(m.get("sentiment"), "⚪")
+                synthesis += f"- {sentiment_emoji} ({m.get('sources', 0)} sources) {m.get('content', '')[:300]}...\n"
+            synthesis += "\n"
+
+        synthesis += "---\n\n"
 
     return synthesis
 
 
-def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> dict:
+def calculate_quality_score(grok_results: list, market_results: list, synthesis: str) -> dict:
+    """Calculate quality score based on concrete metrics."""
+    scores = {}
+
+    # 1. Grok KOL Insights Quality (0-10)
+    grok_successes = sum(1 for g in grok_results if g.get("success"))
+    grok_total = len(grok_results) if grok_results else 1
+    grok_content_len = sum(len(g.get("content", "")) for g in grok_results)
+    grok_dimensions = sum(len(g.get("dimensions", [])) for g in grok_results)
+
+    grok_score = min(10, (
+        (grok_successes / grok_total) * 4 +  # Success rate (0-4)
+        min(4, grok_content_len / 2000) +     # Content depth (0-4)
+        min(2, grok_dimensions)                # Dimension coverage (0-2)
+    ))
+    scores["kol_insights"] = round(grok_score, 1)
+
+    # 2. Market News Quality (0-10)
+    market_successes = sum(1 for m in market_results if m.get("success"))
+    market_total = len(market_results) if market_results else 1
+    total_sources = sum(m.get("sources", 0) for m in market_results)
+    sentiment_diversity = len(set(m.get("sentiment", "unknown") for m in market_results))
+
+    market_score = min(10, (
+        (market_successes / market_total) * 4 +  # Success rate (0-4)
+        min(4, total_sources / 15) +              # Source count (0-4)
+        sentiment_diversity                        # Sentiment diversity (0-2)
+    ))
+    scores["market_data"] = round(market_score, 1)
+
+    # 3. Synthesis Quality (0-10)
+    synth_len = len(synthesis)
+    has_kol = "KOL" in synthesis or "Insights" in synthesis
+    has_market = "Market" in synthesis or "News" in synthesis
+    has_sentiment = "bullish" in synthesis.lower() or "bearish" in synthesis.lower()
+
+    synth_score = min(10, (
+        min(4, synth_len / 1000) +    # Length (0-4)
+        (2 if has_kol else 0) +       # Has KOL section (0-2)
+        (2 if has_market else 0) +    # Has market section (0-2)
+        (2 if has_sentiment else 0)   # Has sentiment (0-2)
+    ))
+    scores["synthesis"] = round(synth_score, 1)
+
+    # Overall score (weighted average)
+    overall = (scores["kol_insights"] * 0.4 + scores["market_data"] * 0.3 + scores["synthesis"] * 0.3)
+    scores["overall"] = round(overall, 1)
+
+    return scores
+
+
+def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str,
+                         grok_results: list = None, market_results: list = None) -> dict:
     """Get Gemini 3 Pro to evaluate and suggest improvements."""
     import re
     text = ""
+
+    # Calculate metrics-based score first
+    if grok_results and market_results:
+        quality_scores = calculate_quality_score(grok_results, market_results, synthesis)
+        base_score = quality_scores["overall"]
+    else:
+        quality_scores = {"kol_insights": 6, "market_data": 6, "synthesis": 6, "overall": 6}
+        base_score = 6
 
     # Get learnings from previous iterations
     learnings = get_learnings_summary()
@@ -191,65 +286,53 @@ def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> d
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         client = genai.Client(api_key=api_key)
 
-        # Enhanced prompt with specific improvement targets
-        prompt = f"""You are a senior engineer improving a Stock Advisor app. Evaluate the KOL insights quality and suggest ONE concrete code improvement.
+        # Simpler, more focused prompt
+        prompt = f"""Rate this stock analysis and suggest ONE improvement.
 
-ITERATION: {iteration}
+ANALYSIS OUTPUT:
+{synthesis[:2500]}
 
-PREVIOUS ITERATIONS FEEDBACK:
-{learnings}
+CURRENT CODE VALUES (from services/grok_service.py):
+- temperature: 0.35 (lower = more focused)
+- max_tokens: 3200 (higher = longer responses)
+- max_retries: 7
+- timeout: 180s
+- cache_ttl: 14400s
 
-STOCK ANALYSIS OUTPUT (evaluate quality):
-{synthesis[:3000]}
+CALCULATED METRICS:
+- KOL Quality: {quality_scores['kol_insights']}/10
+- Market Data: {quality_scores['market_data']}/10
+- Synthesis: {quality_scores['synthesis']}/10
+- Base Score: {base_score}/10
 
-IMPROVEMENT TARGETS (pick ONE to improve):
-```python
-# From services/grok_service.py - adjust these values:
-"temperature": 0.35,  # Lower = more focused responses
-"max_tokens": 2800    # Higher = longer responses
-max_retries: int = 6, # More retries for reliability
-timeout: int = 150,   # Timeout in seconds
+TASK: Return JSON with score and ONE improvement suggestion.
 
-# From integrations/finnhub.py - adjust cache TTLs:
-QUOTE_CACHE_TTL = 1200   # Quote cache seconds
-NEWS_CACHE_TTL = 1500    # News cache seconds
-PROFILE_CACHE_TTL = 7200 # Profile cache seconds
-```
+Example response:
+{{"score": 7, "issues": ["responses too short", "missing dimensions"], "improvement": {{"file": "services/grok_service.py", "desc": "Increase depth", "old": "max_tokens: 3200", "new": "max_tokens: 3500"}}, "summary": "Increased tokens"}}
 
-ACTUAL CODE CONTEXT:
-{code_context[:4000]}
-
-EVALUATE AND IMPROVE:
-1. Rate the stock analysis output (1-10)
-2. Identify specific quality issues
-3. Suggest ONE code change to improve quality
-
-Return VALID JSON ONLY (no markdown):
-{{"score": 7, "issues": ["Grok responses lack depth", "Missing sentiment analysis"], "improvements": [{{"file": "services/grok_service.py", "desc": "Increase response depth", "old": "\"max_tokens\": 2800", "new": "\"max_tokens\": 3200"}}], "summary": "Increased max_tokens for deeper analysis"}}
-
-RULES:
-- "old" must be EXACT text from code (copy-paste, include quotes if present)
-- "new" must be valid Python replacement
-- Focus on: max_tokens, temperature, timeout, cache TTLs
-- Score: 1-3=poor, 4-6=adequate, 7-8=good, 9-10=excellent
-
-JSON:"""
+Your JSON response:"""
 
         response = client.models.generate_content(
             model="gemini-3-pro-preview",
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.2,
-                max_output_tokens=2000,
+                temperature=0.1,  # Lower for more consistent JSON
+                max_output_tokens=1000,
             ),
         )
 
         # Safely get response text
         text = response.text if response and response.text else ""
 
-        if not text:
-            log("Empty response from Gemini")
-            return {"score": 6, "issues": [], "improvements": [], "summary": "Empty response"}
+        if not text or len(text.strip()) < 10:
+            log(f"Empty/short response from Gemini (len={len(text)})")
+            return {
+                "score": int(base_score),
+                "quality_breakdown": quality_scores,
+                "issues": ["Gemini returned empty response"],
+                "improvements": [],
+                "summary": f"Using calculated score: {base_score}"
+            }
 
         # Clean up response - extract JSON
         text = text.strip()
@@ -262,28 +345,54 @@ JSON:"""
             if len(parts) >= 2:
                 text = parts[1]
 
-        # Try to find JSON object
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
-        if json_match:
-            text = json_match.group(0)
+        # Try to find JSON object - more permissive regex
+        text = text.strip()
+        if not text.startswith("{"):
+            json_start = text.find("{")
+            if json_start >= 0:
+                text = text[json_start:]
 
-        result = json.loads(text.strip())
+        # Find matching brace
+        brace_count = 0
+        json_end = 0
+        for i, c in enumerate(text):
+            if c == "{":
+                brace_count += 1
+            elif c == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i + 1
+                    break
+
+        if json_end > 0:
+            text = text[:json_end]
+
+        result = json.loads(text)
+
+        # Extract score - use Gemini's score if reasonable, otherwise use calculated
+        gemini_score = result.get("score", base_score)
+        if isinstance(gemini_score, (int, float)) and 1 <= gemini_score <= 10:
+            # Blend Gemini's assessment with calculated metrics
+            final_score = int((gemini_score * 0.6 + base_score * 0.4))
+        else:
+            final_score = int(base_score)
 
         # Normalize the result structure
         normalized = {
-            "score": result.get("score", 6),
-            "quality_breakdown": {
-                "kol_insights": result.get("kol_quality", result.get("quality_breakdown", {}).get("kol_insights", 6)),
-                "market_data": result.get("market_quality", result.get("quality_breakdown", {}).get("market_data", 6)),
-            },
+            "score": final_score,
+            "quality_breakdown": quality_scores,
             "issues": result.get("issues", []),
             "improvements": [],
             "summary": result.get("summary", "Evaluation complete"),
         }
 
-        # Convert improvements to standard format
-        for imp in result.get("improvements", []):
-            if isinstance(imp, dict) and imp.get("old") and imp.get("new"):
+        # Handle single improvement or list
+        improvements = result.get("improvements", [])
+        if not improvements and result.get("improvement"):
+            improvements = [result.get("improvement")]
+
+        for imp in (improvements if isinstance(improvements, list) else [improvements]):
+            if isinstance(imp, dict) and (imp.get("old") or imp.get("old_code")):
                 normalized["improvements"].append({
                     "file": imp.get("file", "services/grok_service.py"),
                     "description": imp.get("desc", imp.get("description", "Improvement")),
@@ -291,20 +400,28 @@ JSON:"""
                     "new_code": imp.get("new", imp.get("new_code", "")),
                 })
 
+        log(f"  Gemini evaluation: score={final_score}, issues={len(normalized['issues'])}, improvements={len(normalized['improvements'])}")
         return normalized
 
     except json.JSONDecodeError as e:
         log(f"JSON parse error: {e}")
-        # Extract score with regex fallback
-        try:
-            score_match = re.search(r'"score"[:\s]+(\d+)', text)
-            score = int(score_match.group(1)) if score_match else 6
-            return {"score": score, "issues": [], "improvements": [], "summary": f"JSON parse error, extracted score={score}"}
-        except:
-            return {"score": 6, "issues": [], "improvements": [], "summary": "Parse error fallback"}
+        # Return calculated score on parse error
+        return {
+            "score": int(base_score),
+            "quality_breakdown": quality_scores,
+            "issues": [f"JSON parse error: {str(e)[:50]}"],
+            "improvements": [],
+            "summary": f"Parse error, using calculated score: {base_score}"
+        }
     except Exception as e:
         log(f"Gemini evaluation error: {e}")
-        return {"score": 6, "issues": [], "improvements": [], "summary": str(e)}
+        return {
+            "score": int(base_score),
+            "quality_breakdown": quality_scores,
+            "issues": [str(e)[:100]],
+            "improvements": [],
+            "summary": f"Error: {str(e)[:50]}"
+        }
 
 
 def apply_improvement(improvement: dict) -> bool:
@@ -444,67 +561,129 @@ ITERATION_LEARNINGS = []
 # NOTE: Already applied in previous runs: timeout (60→90), GROK_CACHE_TTL (3600→7200),
 #       QUOTE_CACHE_TTL (300→600), FINANCIALS_CACHE_TTL (3600→7200)
 FALLBACK_IMPROVEMENTS = [
-    # Round 4: Fresh improvements for TSLA/NVDA/GOOGL/ONDS focused iterations
-    # Based on current code state after previous rounds
+    # Round 5: Fresh improvements based on current code state (after Round 4)
+    # Current: max_retries=7, timeout=180, cache_ttl=14400
+    # Current: QUOTE_CACHE_TTL=1500, PROFILE_CACHE_TTL=10800, NEWS_CACHE_TTL=1800
     {
         "file": "services/grok_service.py",
-        "description": "Increase main prompt max tokens for deeper analysis",
-        "old_code": '"stream": False,\n            "temperature": 0.35,\n            "max_tokens": 2800',
-        "new_code": '"stream": False,\n            "temperature": 0.35,\n            "max_tokens": 3200',
+        "description": "Increase main prompt max tokens for deeper KOL analysis",
+        "old_code": '"temperature": 0.35,\n            "max_tokens": 3200',
+        "new_code": '"temperature": 0.35,\n            "max_tokens": 3500',
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase max retries for API reliability",
-        "old_code": "max_retries: int = 6,",
-        "new_code": "max_retries: int = 7,",
+        "description": "Increase max retries for better reliability",
+        "old_code": "max_retries: int = 7,",
+        "new_code": "max_retries: int = 8,",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase timeout for slow network conditions",
-        "old_code": "timeout: int = 150,",
-        "new_code": "timeout: int = 180,",
+        "description": "Increase timeout for complex queries",
+        "old_code": "timeout: int = 180,",
+        "new_code": "timeout: int = 200,",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase Grok cache TTL for efficiency",
+        "old_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "14400"))',
+        "new_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "18000"))',
     },
     {
         "file": "integrations/finnhub.py",
-        "description": "Increase quote cache TTL for efficiency",
-        "old_code": "QUOTE_CACHE_TTL = 1200",
-        "new_code": "QUOTE_CACHE_TTL = 1500",
+        "description": "Increase financials cache TTL",
+        "old_code": "FINANCIALS_CACHE_TTL = 7200",
+        "new_code": "FINANCIALS_CACHE_TTL = 10800",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase search_and_summarize tokens",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 2000',
+        "new_code": '"temperature": 0.3,\n            "max_tokens": 2200',
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase synthesize_kol_views tokens",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 2800',
+        "new_code": '"temperature": 0.3,\n            "max_tokens": 3000',
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase CI search max tokens",
+        "old_code": '"temperature": 0.25,\n            "max_tokens": 2500',
+        "new_code": '"temperature": 0.25,\n            "max_tokens": 2800',
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase news cache TTL for stability",
+        "old_code": "NEWS_CACHE_TTL = 1800",
+        "new_code": "NEWS_CACHE_TTL = 2100",
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase quote cache TTL",
+        "old_code": "QUOTE_CACHE_TTL = 1500",
+        "new_code": "QUOTE_CACHE_TTL = 1800",
+    },
+    # Round 6: Additional improvements
+    {
+        "file": "services/grok_service.py",
+        "description": "Further increase main prompt tokens",
+        "old_code": '"temperature": 0.35,\n            "max_tokens": 3500',
+        "new_code": '"temperature": 0.35,\n            "max_tokens": 3800',
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Lower temperature for more focused responses",
+        "old_code": '"temperature": 0.35,\n            "max_tokens": 3800',
+        "new_code": '"temperature": 0.32,\n            "max_tokens": 3800',
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase research max tokens",
+        "old_code": '"temperature": 0.25,  # Lower temp for research accuracy\n            "max_tokens": 3000',
+        "new_code": '"temperature": 0.25,  # Lower temp for research accuracy\n            "max_tokens": 3300',
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase candle cache TTL",
+        "old_code": "CANDLE_CACHE_TTL = 7200",
+        "new_code": "CANDLE_CACHE_TTL = 10800",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase CI search tokens further",
+        "old_code": '"temperature": 0.25,\n            "max_tokens": 2800',
+        "new_code": '"temperature": 0.25,\n            "max_tokens": 3100',
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase synthesize tokens further",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 3000',
+        "new_code": '"temperature": 0.3,\n            "max_tokens": 3200',
     },
     {
         "file": "integrations/finnhub.py",
         "description": "Increase profile cache TTL",
-        "old_code": "PROFILE_CACHE_TTL = 7200",
-        "new_code": "PROFILE_CACHE_TTL = 10800",
+        "old_code": "PROFILE_CACHE_TTL = 10800",
+        "new_code": "PROFILE_CACHE_TTL = 14400",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase Grok cache TTL for longer retention",
-        "old_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "10800"))',
-        "new_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "14400"))',
+        "description": "Increase search_and_summarize further",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 2200',
+        "new_code": '"temperature": 0.3,\n            "max_tokens": 2400',
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase search_and_summarize max tokens",
-        "old_code": '"temperature": 0.3,\n            "max_tokens": 1800',
-        "new_code": '"temperature": 0.3,\n            "max_tokens": 2000',
+        "description": "Increase max retries to 9",
+        "old_code": "max_retries: int = 8,",
+        "new_code": "max_retries: int = 9,",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase synthesize_kol_views max tokens",
-        "old_code": '"temperature": 0.3,\n            "max_tokens": 2500',
-        "new_code": '"temperature": 0.3,\n            "max_tokens": 2800',
-    },
-    {
-        "file": "integrations/finnhub.py",
-        "description": "Increase news cache TTL further",
-        "old_code": "NEWS_CACHE_TTL = 1500",
-        "new_code": "NEWS_CACHE_TTL = 1800",
-    },
-    {
-        "file": "services/grok_service.py",
-        "description": "Increase CI search max tokens for comprehensive analysis",
-        "old_code": '"temperature": 0.25,\n            "max_tokens": 2200',
-        "new_code": '"temperature": 0.25,\n            "max_tokens": 2500',
+        "description": "Increase timeout to 220s",
+        "old_code": "timeout: int = 200,",
+        "new_code": "timeout: int = 220,",
     },
 ]
 
@@ -594,7 +773,11 @@ def run_iteration(iteration: int, total_iterations: int = 0, previous_results: l
     # Step 4: Evaluate with Gemini 3 Pro
     log("\n--- Step 4: Gemini 3 Pro Evaluation ---")
     code_context = get_code_context()
-    evaluation = evaluate_with_gemini(synthesis, iteration, code_context)
+    evaluation = evaluate_with_gemini(
+        synthesis, iteration, code_context,
+        grok_results=results["grok_results"],
+        market_results=results["market_results"]
+    )
     results["evaluation"] = evaluation
 
     score = evaluation.get("score", 0)
@@ -606,7 +789,11 @@ def run_iteration(iteration: int, total_iterations: int = 0, previous_results: l
     if evaluation.get("issues"):
         log(f"  Issues found: {len(evaluation['issues'])}")
         for issue in evaluation["issues"][:3]:
-            log(f"    [{issue.get('severity', '?')}] {issue.get('description', '')[:60]}")
+            # Handle both string and dict issues
+            if isinstance(issue, dict):
+                log(f"    [{issue.get('severity', '?')}] {issue.get('description', '')[:60]}")
+            else:
+                log(f"    - {str(issue)[:70]}")
 
     # Step 5: Apply improvements
     log("\n--- Step 5: Applying Improvements ---")
