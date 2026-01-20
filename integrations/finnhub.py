@@ -301,7 +301,7 @@ class FinnhubClient:
     FINANCIALS_CACHE_TTL = 7200  # 1 hour
     NEWS_CACHE_TTL = 1200  # 15 minutes
     CANDLE_CACHE_TTL = 7200  # 1 hour for daily candles
-    EARNINGS_CACHE_TTL = 86400  # 1 day for earnings calendar
+    EARNINGS_CACHE_TTL = 172800  # 1 day for earnings calendar
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or getattr(settings, 'FINNHUB_API_KEY', None) or os.getenv("FINNHUB_API_KEY")
