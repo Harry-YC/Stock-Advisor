@@ -838,7 +838,7 @@ Focus on posts from known traders, analysts, and finance accounts."""
             ],
             "model": self.model,
             "temperature": 0.3,
-            "max_tokens": 1000
+            "max_tokens": 1200
         }
 
         try:
