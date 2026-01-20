@@ -326,8 +326,9 @@ Respond in JSON format:
 
 def run_iteration(iteration: int) -> dict:
     """Run one iteration of the CI loop."""
+    num_iterations = int(os.getenv("CI_ITERATIONS", "3"))
     print(f"\n{'='*60}")
-    print(f"ITERATION {iteration}/5")
+    print(f"ITERATION {iteration}/{num_iterations}")
     print(f"{'='*60}")
 
     results = {
@@ -443,8 +444,9 @@ def main():
     all_results = []
     scores = []
 
-    # Run 5 iterations
-    for i in range(1, 6):
+    # Run iterations (configurable)
+    num_iterations = int(os.getenv("CI_ITERATIONS", "3"))
+    for i in range(1, num_iterations + 1):
         try:
             result = run_iteration(i)
             all_results.append(result)

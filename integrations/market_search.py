@@ -84,24 +84,20 @@ class MarketSearchClient:
     def is_available(self) -> bool:
         return bool(self.api_key)
 
-    def _get_model(self, model_name: str = "gemini-3-flash-preview"):
-        """Get or initialize the generative model."""
-        normalized_model = _normalize_model_name(model_name)
-
-        if self._model is None or getattr(self, '_current_model', None) != normalized_model:
+    def _get_client(self):
+        """Get or initialize the genai client."""
+        if getattr(self, '_client', None) is None:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self._model = genai.GenerativeModel(normalized_model)
-                self._current_model = normalized_model
-                logger.info(f"Initialized model: {normalized_model}")
+                from google import genai
+                self._client = genai.Client(api_key=self.api_key)
+                logger.info("Initialized google.genai client")
             except ImportError:
-                logger.error("google-generativeai package not installed")
+                logger.error("google-genai package not installed")
                 return None
             except Exception as e:
-                logger.error(f"Failed to initialize model: {e}")
+                logger.error(f"Failed to initialize client: {e}")
                 return None
-        return self._model
+        return self._client
 
     def search_stock_news(
         self,
@@ -283,42 +279,38 @@ class MarketSearchClient:
             )
 
         try:
-            import google.generativeai as genai
-            from google.generativeai import types
+            from google import genai
+            from google.genai import types
         except ImportError:
             return MarketSearchResult(
-                content="google-generativeai package not installed",
+                content="google-genai package not installed",
                 sources=[],
             )
 
-        model = self._get_model(model_name)
-        if not model:
+        client = self._get_client()
+        if not client:
             return MarketSearchResult(
-                content="Failed to initialize model",
+                content="Failed to initialize client",
                 sources=[],
             )
 
-        # Configure grounding tool
-        try:
-            from google.generativeai.types import Tool
-            tools = Tool.from_google_search_retrieval(
-                google_search_retrieval=types.GoogleSearchRetrieval()
-            )
-        except (AttributeError, TypeError):
-            try:
-                tools = types.GoogleSearchRetrieval()
-            except (AttributeError, TypeError):
-                tools = [{'google_search_retrieval': {}}]
+        # Configure grounding tool using new google.genai API
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
 
-        generation_config = types.GenerationConfig(temperature=0.5)
+        config = types.GenerateContentConfig(
+            tools=[grounding_tool],
+            temperature=0.5,
+        )
 
         full_prompt = f"System: {system_context}\n\nUser: {query}"
 
         try:
-            response = model.generate_content(
-                full_prompt,
-                tools=tools,
-                generation_config=generation_config
+            response = client.models.generate_content(
+                model=model_name,
+                contents=full_prompt,
+                config=config,
             )
 
             # Extract content and sources
@@ -326,28 +318,26 @@ class MarketSearchClient:
             sources = []
             search_queries = []
 
+            if hasattr(response, 'text'):
+                content_text = response.text
+
             if hasattr(response, 'candidates') and response.candidates:
                 candidate = response.candidates[0]
 
-                try:
-                    content_text = response.text
-                except ValueError:
-                    if candidate.finish_reason != 1:
-                        content_text = f"[Response blocked: {candidate.finish_reason}]"
-
-                if hasattr(candidate, 'grounding_metadata'):
+                if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
                     metadata = candidate.grounding_metadata
 
-                    if hasattr(metadata, 'search_entry_point'):
-                        if hasattr(metadata.search_entry_point, 'rendered_content'):
-                            search_queries = [metadata.search_entry_point.rendered_content]
+                    # Get search queries
+                    if hasattr(metadata, 'web_search_queries') and metadata.web_search_queries:
+                        search_queries = list(metadata.web_search_queries)
 
+                    # Get grounding chunks (sources)
                     if hasattr(metadata, 'grounding_chunks') and metadata.grounding_chunks:
                         for chunk in metadata.grounding_chunks:
-                            if hasattr(chunk, 'web'):
+                            if hasattr(chunk, 'web') and chunk.web:
                                 sources.append(MarketSource(
-                                    title=chunk.web.title or "Web Source",
-                                    url=chunk.web.uri or "",
+                                    title=getattr(chunk.web, 'title', None) or "Web Source",
+                                    url=getattr(chunk.web, 'uri', None) or "",
                                     snippet="",
                                     source_type="news"
                                 ))
