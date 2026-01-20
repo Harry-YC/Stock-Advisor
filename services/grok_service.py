@@ -871,7 +871,7 @@ Be specific and cite sources."""
             ],
             "model": self.model,
             "temperature": 0.3,
-            "max_tokens": 1500
+            "max_tokens": 1800
         }
 
         try:
