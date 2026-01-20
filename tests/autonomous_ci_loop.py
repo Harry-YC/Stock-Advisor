@@ -24,67 +24,68 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-# Stock questions for continuous iterations - cycles through these
+# Stock questions for continuous iterations - focused on TSLA, ONDS, GOOGL, NVDA
+# 2-3 diverse questions per stock covering different analysis dimensions
 ITERATION_QUESTIONS = [
-    # Set 1: Mega-cap Tech
+    # Set 1: TSLA - Technical & Sentiment
     [
-        {"symbol": "NVDA", "question": "What's the institutional sentiment on NVDA? Are hedge funds buying or selling?"},
-        {"symbol": "AAPL", "question": "What do finance KOLs think about Apple's AI strategy and iPhone sales?"},
-        {"symbol": "MSFT", "question": "Is Microsoft overvalued? What's the sentiment on Azure growth?"},
+        {"symbol": "TSLA", "question": "What's the technical analysis on Tesla? Key support/resistance levels and chart patterns?"},
+        {"symbol": "TSLA", "question": "What's the retail vs institutional sentiment on Tesla right now on X/Twitter?"},
+        {"symbol": "TSLA", "question": "Is Tesla overvalued at current P/E? What do value investors say?"},
     ],
-    # Set 2: Semiconductor & AI
+    # Set 2: NVDA - AI & Growth
     [
-        {"symbol": "TSM", "question": "What's the geopolitical risk for TSM and how are KOLs positioning?"},
-        {"symbol": "AMD", "question": "AMD vs NVDA - which do retail traders prefer? Options flow?"},
-        {"symbol": "AVGO", "question": "What's the options flow and institutional sentiment on Broadcom?"},
+        {"symbol": "NVDA", "question": "What's the institutional flow on NVIDIA? Are hedge funds accumulating or distributing?"},
+        {"symbol": "NVDA", "question": "NVIDIA's AI chip dominance - how sustainable is it? What do tech analysts say?"},
+        {"symbol": "NVDA", "question": "What's the options flow on NVDA? Any unusual activity or big bets?"},
     ],
-    # Set 3: EV & Clean Energy
+    # Set 3: GOOGL - Competition & Valuation
     [
-        {"symbol": "TSLA", "question": "What are the bull and bear cases for Tesla on X?"},
-        {"symbol": "RIVN", "question": "Is Rivian a buy? What do analysts and KOLs say?"},
-        {"symbol": "ENPH", "question": "What's the short interest and sentiment on Enphase Energy?"},
+        {"symbol": "GOOGL", "question": "Google vs OpenAI/Microsoft in AI - who's winning? KOL sentiment?"},
+        {"symbol": "GOOGL", "question": "Is Alphabet undervalued compared to other Mag7? What's the consensus?"},
+        {"symbol": "GOOGL", "question": "What's the impact of AI on Google Search revenue? Bear case analysis?"},
     ],
-    # Set 4: Finance & Healthcare
+    # Set 4: ONDS - Microcap Analysis
     [
-        {"symbol": "JPM", "question": "How are banks positioned for Fed rate decisions?"},
-        {"symbol": "UNH", "question": "What's the sentiment on healthcare stocks and UnitedHealth?"},
-        {"symbol": "V", "question": "Is Visa a defensive play? What do KOLs think?"},
+        {"symbol": "ONDS", "question": "What's the sentiment on Ondas Holdings? Any insider activity or institutional interest?"},
+        {"symbol": "ONDS", "question": "Ondas drone technology - competitive positioning and growth potential?"},
+        {"symbol": "ONDS", "question": "ONDS short interest and squeeze potential - what do traders say?"},
     ],
-    # Set 5: Big Tech
+    # Set 5: TSLA - EV Market & Competition
     [
-        {"symbol": "GOOGL", "question": "What do KOLs think about Google's AI vs ChatGPT competition?"},
-        {"symbol": "AMZN", "question": "Is Amazon's AWS growth sustainable? Retail vs cloud debate?"},
-        {"symbol": "META", "question": "Meta's AI pivot - are KOLs bullish or bearish now?"},
+        {"symbol": "TSLA", "question": "Tesla vs BYD and Chinese EV makers - who wins the global EV war?"},
+        {"symbol": "TSLA", "question": "What's the sentiment on Tesla's robotaxi and FSD progress?"},
+        {"symbol": "TSLA", "question": "Tesla energy storage and solar business - undervalued catalyst?"},
     ],
-    # Set 6: Growth & Momentum
+    # Set 6: NVDA - Fundamentals & Risks
     [
-        {"symbol": "PLTR", "question": "Is Palantir overvalued? What's the retail sentiment on X?"},
-        {"symbol": "SNOW", "question": "Snowflake growth outlook - what do tech analysts say?"},
-        {"symbol": "CRWD", "question": "CrowdStrike after the outage - buy the dip or avoid?"},
+        {"symbol": "NVDA", "question": "NVIDIA earnings expectations - what's priced in? Risk of disappointment?"},
+        {"symbol": "NVDA", "question": "China export restrictions impact on NVIDIA - how big is the risk?"},
+        {"symbol": "NVDA", "question": "NVIDIA vs AMD vs Intel - competitive moat analysis from KOLs?"},
     ],
-    # Set 7: Value & Dividend
+    # Set 7: GOOGL - Revenue & Products
     [
-        {"symbol": "BRK.B", "question": "Berkshire Hathaway cash pile - what's Buffett thinking?"},
-        {"symbol": "JNJ", "question": "Johnson & Johnson as defensive play - KOL sentiment?"},
-        {"symbol": "PG", "question": "Consumer staples in this economy - is P&G a safe bet?"},
+        {"symbol": "GOOGL", "question": "YouTube and Cloud growth trajectory - what do analysts project?"},
+        {"symbol": "GOOGL", "question": "Antitrust risks for Google - how are investors pricing this in?"},
+        {"symbol": "GOOGL", "question": "Waymo autonomous driving - hidden value in Alphabet? KOL views?"},
     ],
-    # Set 8: China & Emerging
+    # Set 8: Mixed - Cross Analysis
     [
-        {"symbol": "BABA", "question": "Alibaba risk/reward - what do KOLs say about China exposure?"},
-        {"symbol": "PDD", "question": "PDD Holdings (Temu) growth - sustainable or bubble?"},
-        {"symbol": "NIO", "question": "NIO vs Chinese EV competition - buy, hold, or sell?"},
+        {"symbol": "NVDA", "question": "Is NVIDIA the best AI play or is it overextended? Contrarian views?"},
+        {"symbol": "TSLA", "question": "Elon Musk political involvement impact on Tesla brand - bull vs bear?"},
+        {"symbol": "GOOGL", "question": "Google Gemini vs GPT-5 expectations - who leads in 2025?"},
     ],
-    # Set 9: Retail & Consumer
+    # Set 9: ONDS & Small Cap
     [
-        {"symbol": "WMT", "question": "Walmart vs Amazon - who wins in retail? KOL views?"},
-        {"symbol": "COST", "question": "Costco premium valuation - justified or overpriced?"},
-        {"symbol": "TGT", "question": "Target turnaround - what's the institutional sentiment?"},
+        {"symbol": "ONDS", "question": "Ondas government contracts and revenue outlook - growth catalysts?"},
+        {"symbol": "ONDS", "question": "Is ONDS a takeover target? M&A speculation in drone sector?"},
+        {"symbol": "TSLA", "question": "Tesla Optimus robot timeline and market potential - realistic assessment?"},
     ],
-    # Set 10: Biotech & Pharma
+    # Set 10: Portfolio Strategy
     [
-        {"symbol": "LLY", "question": "Eli Lilly weight-loss drugs - is the rally sustainable?"},
-        {"symbol": "MRNA", "question": "Moderna post-COVID - what's next? KOL sentiment?"},
-        {"symbol": "ABBV", "question": "AbbVie dividend and growth outlook - analyst views?"},
+        {"symbol": "NVDA", "question": "Should I buy NVDA dips or wait for correction? Timing strategies?"},
+        {"symbol": "GOOGL", "question": "GOOGL as a value play in tech - dividend potential and buybacks?"},
+        {"symbol": "TSLA", "question": "Tesla as a long-term hold vs trade - what's the smart money doing?"},
     ],
 ]
 
@@ -190,36 +191,47 @@ def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> d
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         client = genai.Client(api_key=api_key)
 
-        # Enhanced prompt with learnings
-        prompt = f"""You are improving a Stock Advisor app. Evaluate the output and suggest ONE concrete code improvement.
+        # Enhanced prompt with specific improvement targets
+        prompt = f"""You are a senior engineer improving a Stock Advisor app. Evaluate the KOL insights quality and suggest ONE concrete code improvement.
 
 ITERATION: {iteration}
 
-PREVIOUS LEARNINGS:
+PREVIOUS ITERATIONS FEEDBACK:
 {learnings}
 
-CURRENT OUTPUT QUALITY:
-{synthesis[:2500]}
+STOCK ANALYSIS OUTPUT (evaluate quality):
+{synthesis[:3000]}
 
-CODE TO IMPROVE (find exact strings to replace):
-{code_context[:5000]}
+IMPROVEMENT TARGETS (pick ONE to improve):
+```python
+# From services/grok_service.py - adjust these values:
+"temperature": 0.35,  # Lower = more focused responses
+"max_tokens": 2800    # Higher = longer responses
+max_retries: int = 6, # More retries for reliability
+timeout: int = 150,   # Timeout in seconds
 
-IMPORTANT: You MUST suggest at least ONE improvement. Look for:
-- Error handling that could be added
-- Timeout values that could be adjusted
-- Cache TTLs that could be optimized
-- Logging that could be added
-- Default values that could be improved
+# From integrations/finnhub.py - adjust cache TTLs:
+QUOTE_CACHE_TTL = 1200   # Quote cache seconds
+NEWS_CACHE_TTL = 1500    # News cache seconds
+PROFILE_CACHE_TTL = 7200 # Profile cache seconds
+```
 
-Return ONLY valid JSON (no markdown, no ```):
-{{"score": 7, "issues": ["issue description"], "improvements": [{{"file": "services/grok_service.py", "desc": "Add timeout handling", "old": "EXACT code from above", "new": "improved code"}}], "summary": "what was improved"}}
+ACTUAL CODE CONTEXT:
+{code_context[:4000]}
 
-CRITICAL RULES:
-1. "old" MUST be an EXACT substring from the CODE section above (copy-paste it)
-2. "new" must be valid Python that replaces "old"
-3. Keep changes to 1-3 lines
-4. Score 1-10 based on output quality
-5. ALWAYS include at least one improvement suggestion
+EVALUATE AND IMPROVE:
+1. Rate the stock analysis output (1-10)
+2. Identify specific quality issues
+3. Suggest ONE code change to improve quality
+
+Return VALID JSON ONLY (no markdown):
+{{"score": 7, "issues": ["Grok responses lack depth", "Missing sentiment analysis"], "improvements": [{{"file": "services/grok_service.py", "desc": "Increase response depth", "old": "\"max_tokens\": 2800", "new": "\"max_tokens\": 3200"}}], "summary": "Increased max_tokens for deeper analysis"}}
+
+RULES:
+- "old" must be EXACT text from code (copy-paste, include quotes if present)
+- "new" must be valid Python replacement
+- Focus on: max_tokens, temperature, timeout, cache TTLs
+- Score: 1-3=poor, 4-6=adequate, 7-8=good, 9-10=excellent
 
 JSON:"""
 
@@ -432,55 +444,67 @@ ITERATION_LEARNINGS = []
 # NOTE: Already applied in previous runs: timeout (60→90), GROK_CACHE_TTL (3600→7200),
 #       QUOTE_CACHE_TTL (300→600), FINANCIALS_CACHE_TTL (3600→7200)
 FALLBACK_IMPROVEMENTS = [
-    # Round 3: Additional improvements after Round 2 applied
-    # Using unique patterns to ensure correct replacement
+    # Round 4: Fresh improvements for TSLA/NVDA/GOOGL/ONDS focused iterations
+    # Based on current code state after previous rounds
     {
-        "file": "integrations/finnhub.py",
-        "description": "Increase news cache TTL",
-        "old_code": "NEWS_CACHE_TTL = 1200",
-        "new_code": "NEWS_CACHE_TTL = 1500",
+        "file": "services/grok_service.py",
+        "description": "Increase main prompt max tokens for deeper analysis",
+        "old_code": '"stream": False,\n            "temperature": 0.35,\n            "max_tokens": 2800',
+        "new_code": '"stream": False,\n            "temperature": 0.35,\n            "max_tokens": 3200',
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase max retries for reliability",
-        "old_code": "max_retries: int = 5,",
-        "new_code": "max_retries: int = 6,",
-    },
-    {
-        "file": "integrations/finnhub.py",
-        "description": "Increase quote cache TTL further",
-        "old_code": "QUOTE_CACHE_TTL = 900",
-        "new_code": "QUOTE_CACHE_TTL = 1200",
+        "description": "Increase max retries for API reliability",
+        "old_code": "max_retries: int = 6,",
+        "new_code": "max_retries: int = 7,",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase timeout for very slow networks",
-        "old_code": "timeout: int = 120,",
-        "new_code": "timeout: int = 150,",
+        "description": "Increase timeout for slow network conditions",
+        "old_code": "timeout: int = 150,",
+        "new_code": "timeout: int = 180,",
     },
     {
         "file": "integrations/finnhub.py",
-        "description": "Increase API request timeout further",
-        "old_code": "timeout=20,",
-        "new_code": "timeout=25,",
+        "description": "Increase quote cache TTL for efficiency",
+        "old_code": "QUOTE_CACHE_TTL = 1200",
+        "new_code": "QUOTE_CACHE_TTL = 1500",
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase profile cache TTL",
+        "old_code": "PROFILE_CACHE_TTL = 7200",
+        "new_code": "PROFILE_CACHE_TTL = 10800",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase cache TTL for longer retention",
-        "old_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "7200"))',
-        "new_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "10800"))',
+        "description": "Increase Grok cache TTL for longer retention",
+        "old_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "10800"))',
+        "new_code": 'self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "14400"))',
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase main prompt max tokens",
-        "old_code": '"stream": False,\n            "temperature": 0.35,\n            "max_tokens": 2500',
-        "new_code": '"stream": False,\n            "temperature": 0.35,\n            "max_tokens": 2800',
+        "description": "Increase search_and_summarize max tokens",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 1800',
+        "new_code": '"temperature": 0.3,\n            "max_tokens": 2000',
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase get_stock_sentiment max tokens",
-        "old_code": '"temperature": 0.3,\n            "max_tokens": 1200',
-        "new_code": '"temperature": 0.3,\n            "max_tokens": 1500',
+        "description": "Increase synthesize_kol_views max tokens",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 2500',
+        "new_code": '"temperature": 0.3,\n            "max_tokens": 2800',
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase news cache TTL further",
+        "old_code": "NEWS_CACHE_TTL = 1500",
+        "new_code": "NEWS_CACHE_TTL = 1800",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase CI search max tokens for comprehensive analysis",
+        "old_code": '"temperature": 0.25,\n            "max_tokens": 2200',
+        "new_code": '"temperature": 0.25,\n            "max_tokens": 2500',
     },
 ]
 
@@ -621,10 +645,47 @@ def run_iteration(iteration: int, total_iterations: int = 0, previous_results: l
 
     results["completed"] = datetime.now().isoformat()
     results["final_score"] = score
+    results["synthesis"] = synthesis  # Save synthesis for review
+
+    # Save detailed iteration output
+    save_iteration_output(iteration, results, questions)
 
     log(f"\n  Iteration {iteration} complete: Score={score}/10, Improvements={results['improvements_applied']}")
 
     return results
+
+
+def save_iteration_output(iteration: int, results: dict, questions: list):
+    """Save detailed output for each iteration."""
+    output_dir = Path(__file__).parent.parent / "output" / "iterations"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"iter_{iteration:03d}_{timestamp}.json"
+
+    # Create detailed output
+    output = {
+        "iteration": iteration,
+        "timestamp": timestamp,
+        "questions": questions,
+        "results": {
+            "grok_insights": results.get("grok_results", []),
+            "market_news": results.get("market_results", []),
+            "synthesis": results.get("synthesis", ""),
+            "evaluation": results.get("evaluation", {}),
+        },
+        "improvements": {
+            "applied": results.get("improvements_applied", 0),
+            "committed": results.get("committed", False),
+        },
+        "score": results.get("final_score", 0),
+    }
+
+    output_path = output_dir / filename
+    with open(output_path, "w") as f:
+        json.dump(output, f, indent=2, default=str)
+
+    log(f"  Output saved: {output_path.name}")
 
 
 def main():
