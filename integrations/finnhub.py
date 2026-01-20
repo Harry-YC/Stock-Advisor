@@ -296,7 +296,7 @@ class FinnhubClient:
     BASE_URL = "https://finnhub.io/api/v1"
 
     # Cache TTLs (seconds)
-    QUOTE_CACHE_TTL = 1200  # 5 minutes
+    QUOTE_CACHE_TTL = 1500  # 5 minutes
     PROFILE_CACHE_TTL = 7200  # 1 hour
     FINANCIALS_CACHE_TTL = 7200  # 1 hour
     NEWS_CACHE_TTL = 1500  # 15 minutes
