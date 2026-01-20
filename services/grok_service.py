@@ -410,7 +410,7 @@ class GrokService:
         self,
         api_key: Optional[str] = None,
         model: str = "default",
-        max_retries: int = 5,
+        max_retries: int = 6,
         timeout: int = 120,
         mock_mode: bool = False
     ):
