@@ -432,41 +432,54 @@ ITERATION_LEARNINGS = []
 # NOTE: Already applied in previous runs: timeout (60→90), GROK_CACHE_TTL (3600→7200),
 #       QUOTE_CACHE_TTL (300→600), FINANCIALS_CACHE_TTL (3600→7200)
 FALLBACK_IMPROVEMENTS = [
+    # Round 2: Additional improvements after first batch applied
     {
         "file": "services/grok_service.py",
-        "description": "Increase max retries for API reliability",
-        "old_code": "max_retries: int = 3,",
-        "new_code": "max_retries: int = 4,",
+        "description": "Lower temperature for more consistent responses",
+        "old_code": '"temperature": 0.4,',
+        "new_code": '"temperature": 0.35,',
     },
     {
         "file": "integrations/finnhub.py",
-        "description": "Increase news cache duration",
-        "old_code": "NEWS_CACHE_TTL = 900",
-        "new_code": "NEWS_CACHE_TTL = 1200",
-    },
-    {
-        "file": "integrations/finnhub.py",
-        "description": "Increase profile cache duration",
-        "old_code": "PROFILE_CACHE_TTL = 3600",
-        "new_code": "PROFILE_CACHE_TTL = 7200",
+        "description": "Increase API request timeout",
+        "old_code": "timeout=15,",
+        "new_code": "timeout=20,",
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase max tokens for better responses",
-        "old_code": '"max_tokens": 2000',
-        "new_code": '"max_tokens": 2500',
-    },
-    {
-        "file": "integrations/finnhub.py",
-        "description": "Increase candle cache duration for daily charts",
-        "old_code": "CANDLE_CACHE_TTL = 3600",
-        "new_code": "CANDLE_CACHE_TTL = 7200",
+        "description": "Increase max tokens in search_and_summarize",
+        "old_code": '"max_tokens": 1500',
+        "new_code": '"max_tokens": 1800',
     },
     {
         "file": "services/grok_service.py",
-        "description": "Increase timeout further for slow networks",
-        "old_code": "timeout: int = 90,",
-        "new_code": "timeout: int = 120,",
+        "description": "Increase max tokens in get_stock_sentiment",
+        "old_code": '"max_tokens": 1000',
+        "new_code": '"max_tokens": 1200',
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase earnings cache TTL for efficiency",
+        "old_code": "EARNINGS_CACHE_TTL = 86400",
+        "new_code": "EARNINGS_CACHE_TTL = 172800",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase max retries for better reliability",
+        "old_code": "max_retries: int = 4,",
+        "new_code": "max_retries: int = 5,",
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase quote cache TTL",
+        "old_code": "QUOTE_CACHE_TTL = 600",
+        "new_code": "QUOTE_CACHE_TTL = 900",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Lower temperature in CI search for accuracy",
+        "old_code": '"temperature": 0.3,\n            "max_tokens": 2000',
+        "new_code": '"temperature": 0.25,\n            "max_tokens": 2200',
     },
 ]
 
