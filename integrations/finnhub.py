@@ -342,7 +342,7 @@ class FinnhubClient:
             response = requests.get(
                 f"{self.BASE_URL}/{endpoint}",
                 params=params,
-                timeout=20,
+                timeout=25,
             )
             response.raise_for_status()
             return response.json()
