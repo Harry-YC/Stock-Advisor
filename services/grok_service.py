@@ -27,40 +27,312 @@ GROK_MODELS = {
     "beta": "grok-beta",
 }
 
-# Stock/Finance KOLs and influencers to monitor
-STOCK_KOLS = [
-    # Macro Strategists
-    "Michael Burry", "Jim Cramer", "Stan Druckenmiller", "Ray Dalio",
-    "Bill Ackman", "Howard Marks", "Mohamed El-Erian",
-    # Retail-Influential
-    "Keith Gill", "Chamath Palihapitiya", "Cathie Wood", "Tom Lee",
-    "Josh Brown", "Barry Ritholtz",
-    # Finance Media
-    "Joe Weisenthal", "Matt Levine", "Jesse Felder", "Kyla Scanlon",
-    # Tech Analysts
-    "Gene Munster", "Dan Ives", "Beth Kindig",
-]
+# =============================================================================
+# ENHANCED KOL DATABASE WITH PROFILES
+# =============================================================================
 
-# X handles for direct search (when names don't match handles)
-STOCK_HANDLES = {
-    "Michael Burry": "@michaeljburry",
-    "Jim Cramer": "@jimcramer",
-    "Keith Gill": "@TheRoaringKitty",
-    "Cathie Wood": "@CathieDWood",
-    "Bill Ackman": "@BillAckman",
-    "Josh Brown": "@ReformedBroker",
-    "Chamath Palihapitiya": "@chaaborst",
-    "Ray Dalio": "@RayDalio",
-    "Stan Druckenmiller": "@standruckenmiller",
-    "Mohamed El-Erian": "@elerianm",
-    "Barry Ritholtz": "@ritholtz",
-    "Tom Lee": "@fundstrat",
-    "Joe Weisenthal": "@TheStalwart",
-    "Matt Levine": "@mattlevine",
-    "Kyla Scanlon": "@kaborostfiscal",
-    "Gene Munster": "@munaboroster",
-    "Dan Ives": "@DivesTech",
-    "Beth Kindig": "@Beth_Kindig",
+# KOL profiles with category, handle, bias, specialty, and activity level
+KOL_PROFILES = {
+    # MACRO STRATEGISTS - Big picture market calls
+    "Michael Burry": {
+        "handle": "@michaeljburry",
+        "category": "macro",
+        "bias": "contrarian_bear",
+        "specialty": ["macro", "shorts", "value", "crash_calls"],
+        "credibility": "high",  # The Big Short fame
+        "post_frequency": "rare",  # Deletes posts often
+        "signal_quality": "high_when_active",
+    },
+    "Stan Druckenmiller": {
+        "handle": "@Stanadruckenmil",
+        "category": "macro",
+        "bias": "flexible",
+        "specialty": ["macro", "currencies", "fed_policy", "tech"],
+        "credibility": "legendary",
+        "post_frequency": "low",
+        "signal_quality": "very_high",
+    },
+    "Ray Dalio": {
+        "handle": "@RayDalio",
+        "category": "macro",
+        "bias": "balanced",
+        "specialty": ["macro", "debt_cycles", "china", "diversification"],
+        "credibility": "high",
+        "post_frequency": "medium",
+        "signal_quality": "educational",
+    },
+    "Mohamed El-Erian": {
+        "handle": "@elerianm",
+        "category": "macro",
+        "bias": "balanced",
+        "specialty": ["fed", "bonds", "inflation", "central_banks"],
+        "credibility": "high",
+        "post_frequency": "high",
+        "signal_quality": "high",
+    },
+    "Howard Marks": {
+        "handle": "@HowardMarksBook",
+        "category": "macro",
+        "bias": "value_cautious",
+        "specialty": ["cycles", "risk", "credit", "value"],
+        "credibility": "legendary",
+        "post_frequency": "low",
+        "signal_quality": "very_high",
+    },
+
+    # ACTIVIST / HEDGE FUND MANAGERS - Position transparency
+    "Bill Ackman": {
+        "handle": "@BillAckman",
+        "category": "activist",
+        "bias": "concentrated_bull",
+        "specialty": ["activism", "large_caps", "macro_hedges"],
+        "credibility": "high",
+        "post_frequency": "high",
+        "signal_quality": "high",  # Often talks book
+    },
+    "David Einhorn": {
+        "handle": "@davideinhorn",
+        "category": "activist",
+        "bias": "value_short",
+        "specialty": ["value", "shorts", "financials"],
+        "credibility": "high",
+        "post_frequency": "low",
+        "signal_quality": "high",
+    },
+    "Carl Icahn": {
+        "handle": "@Carl_C_Icahn",
+        "category": "activist",
+        "bias": "activist_value",
+        "specialty": ["activism", "energy", "conglomerates"],
+        "credibility": "legendary",
+        "post_frequency": "low",
+        "signal_quality": "actionable",
+    },
+
+    # TECH / GROWTH ANALYSTS - Sector specialists
+    "Cathie Wood": {
+        "handle": "@CathieDWood",
+        "category": "tech_growth",
+        "bias": "perma_bull_innovation",
+        "specialty": ["tech", "AI", "genomics", "fintech", "autonomous"],
+        "credibility": "polarizing",  # Big wins and losses
+        "post_frequency": "high",
+        "signal_quality": "directional",  # Good for themes, timing varies
+    },
+    "Dan Ives": {
+        "handle": "@DivesTech",
+        "category": "tech_analyst",
+        "bias": "tech_bull",
+        "specialty": ["tech", "software", "cyber", "AI"],
+        "credibility": "medium_high",
+        "post_frequency": "high",
+        "signal_quality": "good_coverage",
+    },
+    "Gene Munster": {
+        "handle": "@munaboroster",
+        "category": "tech_analyst",
+        "bias": "tech_bull",
+        "specialty": ["AAPL", "TSLA", "tech_hardware", "AR_VR"],
+        "credibility": "medium",
+        "post_frequency": "medium",
+        "signal_quality": "medium",
+    },
+    "Beth Kindig": {
+        "handle": "@Beth_Kindig",
+        "category": "tech_analyst",
+        "bias": "tech_selective",
+        "specialty": ["semiconductors", "AI", "cloud", "deep_tech"],
+        "credibility": "medium_high",
+        "post_frequency": "medium",
+        "signal_quality": "research_driven",
+    },
+
+    # OPTIONS / FLOW TRADERS - Real-time flow intel
+    "Unusual Whales": {
+        "handle": "@unusual_whales",
+        "category": "options_flow",
+        "bias": "data_neutral",
+        "specialty": ["options", "flow", "congress_trades", "dark_pool"],
+        "credibility": "data_source",
+        "post_frequency": "very_high",
+        "signal_quality": "raw_data",
+    },
+    "Cheddar Flow": {
+        "handle": "@CheddarFlow",
+        "category": "options_flow",
+        "bias": "data_neutral",
+        "specialty": ["options", "sweeps", "large_trades"],
+        "credibility": "data_source",
+        "post_frequency": "very_high",
+        "signal_quality": "raw_data",
+    },
+    "SpotGamma": {
+        "handle": "@spotgamma",
+        "category": "options_flow",
+        "bias": "technical",
+        "specialty": ["gamma", "options_greeks", "dealer_positioning"],
+        "credibility": "high",
+        "post_frequency": "high",
+        "signal_quality": "actionable",
+    },
+
+    # RETAIL-INFLUENTIAL - Move retail sentiment
+    "Keith Gill": {
+        "handle": "@TheRoaringKitty",
+        "category": "retail_leader",
+        "bias": "meme_bull",
+        "specialty": ["GME", "value_memes", "retail_rallying"],
+        "credibility": "cult_following",
+        "post_frequency": "sporadic",  # Periods of silence then activity
+        "signal_quality": "market_moving",
+    },
+    "Chamath Palihapitiya": {
+        "handle": "@chamath",
+        "category": "retail_leader",
+        "bias": "vc_tech",
+        "specialty": ["SPACs", "tech", "macro_takes"],
+        "credibility": "declining",  # SPAC track record
+        "post_frequency": "high",
+        "signal_quality": "entertainment",
+    },
+
+    # FINANCE MEDIA / JOURNALISTS - News and analysis
+    "Jim Cramer": {
+        "handle": "@jimcramer",
+        "category": "media",
+        "bias": "momentum",
+        "specialty": ["broad_market", "stock_picks", "hot_takes"],
+        "credibility": "inverse_indicator",  # Famous for being contrarian signal
+        "post_frequency": "very_high",
+        "signal_quality": "contrarian_signal",
+    },
+    "Josh Brown": {
+        "handle": "@ReformedBroker",
+        "category": "media",
+        "bias": "balanced_bull",
+        "specialty": ["behavioral", "advisor_perspective", "market_commentary"],
+        "credibility": "high",
+        "post_frequency": "very_high",
+        "signal_quality": "educational",
+    },
+    "Barry Ritholtz": {
+        "handle": "@ritholtz",
+        "category": "media",
+        "bias": "balanced",
+        "specialty": ["data_driven", "behavioral", "long_term"],
+        "credibility": "high",
+        "post_frequency": "high",
+        "signal_quality": "educational",
+    },
+    "Joe Weisenthal": {
+        "handle": "@TheStalwart",
+        "category": "media",
+        "bias": "curious",
+        "specialty": ["macro", "markets", "economics", "oddities"],
+        "credibility": "high",
+        "post_frequency": "very_high",
+        "signal_quality": "informational",
+    },
+    "Matt Levine": {
+        "handle": "@matt_levine",
+        "category": "media",
+        "bias": "analytical",
+        "specialty": ["finance_structure", "deals", "regulation", "crypto"],
+        "credibility": "very_high",
+        "post_frequency": "low",  # Mostly newsletter
+        "signal_quality": "educational",
+    },
+    "Kyla Scanlon": {
+        "handle": "@kaborost",
+        "category": "media",
+        "bias": "educational",
+        "specialty": ["vibes", "fed", "economy", "explainers"],
+        "credibility": "rising",
+        "post_frequency": "high",
+        "signal_quality": "educational",
+    },
+
+    # QUANT / DATA ANALYSTS
+    "Tom Lee": {
+        "handle": "@fundstrat",
+        "category": "strategist",
+        "bias": "perma_bull",
+        "specialty": ["targets", "crypto", "macro_bull"],
+        "credibility": "medium",
+        "post_frequency": "medium",
+        "signal_quality": "directional",
+    },
+    "Jesse Felder": {
+        "handle": "@jessefelder",
+        "category": "strategist",
+        "bias": "value_bear",
+        "specialty": ["valuation", "bubbles", "macro_bear"],
+        "credibility": "good_track_record",
+        "post_frequency": "medium",
+        "signal_quality": "contrarian",
+    },
+
+    # SHORT SELLERS / BEARS
+    "Hindenburg Research": {
+        "handle": "@HindenburgRes",
+        "category": "short_seller",
+        "bias": "bear_activist",
+        "specialty": ["fraud", "accounting", "short_reports"],
+        "credibility": "high_impact",
+        "post_frequency": "low",  # Report-driven
+        "signal_quality": "market_moving",
+    },
+    "Citron Research": {
+        "handle": "@CitronResearch",
+        "category": "short_seller",
+        "bias": "bear_activist",
+        "specialty": ["shorts", "fraud", "overvaluation"],
+        "credibility": "mixed",
+        "post_frequency": "low",
+        "signal_quality": "volatile",
+    },
+
+    # SEMICONDUCTOR / AI SPECIALISTS
+    "Dylan Patel": {
+        "handle": "@dylan522p",
+        "category": "sector_specialist",
+        "bias": "tech_neutral",
+        "specialty": ["semiconductors", "AI_chips", "supply_chain"],
+        "credibility": "very_high",
+        "post_frequency": "high",
+        "signal_quality": "deep_technical",
+    },
+}
+
+# Backwards compatibility - list of all KOL names
+STOCK_KOLS = list(KOL_PROFILES.keys())
+
+# Extract handles for backwards compatibility
+STOCK_HANDLES = {name: profile["handle"] for name, profile in KOL_PROFILES.items()}
+
+# KOL categories for targeted searches
+KOL_CATEGORIES = {
+    "macro": ["Michael Burry", "Stan Druckenmiller", "Ray Dalio", "Mohamed El-Erian", "Howard Marks"],
+    "activist": ["Bill Ackman", "David Einhorn", "Carl Icahn"],
+    "tech_growth": ["Cathie Wood", "Dan Ives", "Gene Munster", "Beth Kindig"],
+    "options_flow": ["Unusual Whales", "Cheddar Flow", "SpotGamma"],
+    "retail_leader": ["Keith Gill", "Chamath Palihapitiya"],
+    "media": ["Jim Cramer", "Josh Brown", "Barry Ritholtz", "Joe Weisenthal", "Matt Levine", "Kyla Scanlon"],
+    "strategist": ["Tom Lee", "Jesse Felder"],
+    "short_seller": ["Hindenburg Research", "Citron Research"],
+    "sector_specialist": ["Dylan Patel"],
+}
+
+# High-signal KOLs by topic
+HIGH_SIGNAL_KOLS = {
+    "market_crash": ["Michael Burry", "Jesse Felder", "Howard Marks"],
+    "fed_policy": ["Mohamed El-Erian", "Joe Weisenthal", "Kyla Scanlon"],
+    "tech_stocks": ["Cathie Wood", "Dan Ives", "Beth Kindig", "Dylan Patel"],
+    "options_flow": ["Unusual Whales", "SpotGamma", "Cheddar Flow"],
+    "meme_stocks": ["Keith Gill", "Unusual Whales"],
+    "short_reports": ["Hindenburg Research", "Citron Research"],
+    "semiconductors": ["Dylan Patel", "Beth Kindig"],
+    "institutional": ["Bill Ackman", "Stan Druckenmiller", "David Einhorn"],
 }
 
 # Topics relevant to stock/trading ecosystem
@@ -719,6 +991,406 @@ Focus on the last 7 days when possible."""
             logger.error(f"CI search failed for {dimension}: {e}")
             return ""
 
+    def get_kol_by_category(
+        self,
+        category: str,
+        topic: str,
+        max_kols: int = 5
+    ) -> str:
+        """
+        Get insights from KOLs in a specific category about a topic.
+
+        Categories: macro, activist, tech_growth, options_flow, retail_leader,
+                   media, strategist, short_seller, sector_specialist
+
+        Args:
+            category: KOL category to search
+            topic: Topic to search for (e.g., stock ticker, market event)
+            max_kols: Maximum number of KOLs to search
+
+        Returns:
+            Formatted insights from category KOLs
+        """
+        if not self.api_key:
+            return ""
+
+        # Get KOLs in category
+        kols_in_category = KOL_CATEGORIES.get(category, [])[:max_kols]
+        if not kols_in_category:
+            logger.warning(f"Unknown KOL category: {category}")
+            return ""
+
+        # Build KOL context with handles and specialties
+        kol_details = []
+        for name in kols_in_category:
+            profile = KOL_PROFILES.get(name, {})
+            handle = profile.get("handle", "")
+            specialty = ", ".join(profile.get("specialty", [])[:3])
+            bias = profile.get("bias", "unknown")
+            kol_details.append(f"- **{name}** ({handle}) - Specialty: {specialty}, Bias: {bias}")
+
+        kol_context = "\n".join(kol_details)
+
+        # Check cache
+        cache_key = f"cat:{category}:{topic[:30]}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        prompt = f"""Search X for what these specific {category.upper()} voices are saying about: "{topic}"
+
+**PRIORITY KOLs TO SEARCH** (find their actual recent posts):
+{kol_context}
+
+**YOUR TASK:**
+1. Find ACTUAL recent posts from these specific accounts about {topic}
+2. Quote them directly with @handles
+3. Note their stance (bullish/bearish/neutral)
+4. Highlight any disagreements between them
+
+**FORMAT:**
+
+## {category.replace('_', ' ').title()} Perspectives on {topic}
+
+### Individual Takes
+For each KOL who has posted about this:
+- **[Name]** (@handle): "[Direct quote or paraphrase]"
+  - Stance: [Bullish/Bearish/Neutral]
+  - Key Point: [Main argument]
+
+### Consensus vs Disagreement
+- **Agreement**: [What they agree on]
+- **Disagreement**: [Where they differ]
+
+### Signal Quality Assessment
+- Most credible take: [Who and why]
+- Contrarian view: [Who's going against the grain]
+
+Be SPECIFIC. Use real quotes and dates. If a KOL hasn't posted about this topic recently, say so."""
+
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": f"""You are Grok with real-time X access, researching {category} voices in finance.
+Your job is to find ACTUAL posts from the specific accounts listed.
+Be honest if someone hasn't posted about the topic recently.
+Include @handles and approximate dates for all quotes."""
+                },
+                {"role": "user", "content": prompt}
+            ],
+            "model": self.model,
+            "temperature": 0.3,
+            "max_tokens": 1800
+        }
+
+        try:
+            data = self._make_request(payload)
+            result = self._validate_response(data)
+            self._set_cache(cache_key, result)
+            return result
+        except Exception as e:
+            logger.error(f"Category search failed for {category}: {e}")
+            return ""
+
+    def synthesize_kol_views(
+        self,
+        symbol: str,
+        include_categories: Optional[List[str]] = None
+    ) -> str:
+        """
+        Synthesize views from multiple KOL categories into a comprehensive analysis.
+
+        Args:
+            symbol: Stock ticker symbol
+            include_categories: Categories to include (default: all major ones)
+
+        Returns:
+            Synthesized multi-perspective analysis
+        """
+        if not self.api_key:
+            return ""
+
+        # Default categories for comprehensive coverage
+        if include_categories is None:
+            include_categories = ["macro", "tech_growth", "options_flow", "media", "short_seller"]
+
+        # Build comprehensive KOL list
+        all_kols = []
+        for cat in include_categories:
+            kols = KOL_CATEGORIES.get(cat, [])[:3]  # Top 3 from each category
+            for name in kols:
+                profile = KOL_PROFILES.get(name, {})
+                all_kols.append({
+                    "name": name,
+                    "handle": profile.get("handle", ""),
+                    "category": cat,
+                    "bias": profile.get("bias", "unknown"),
+                    "credibility": profile.get("credibility", "unknown")
+                })
+
+        # Build KOL reference
+        kol_reference = "\n".join([
+            f"- {k['name']} ({k['handle']}) - {k['category']}, bias: {k['bias']}, credibility: {k['credibility']}"
+            for k in all_kols
+        ])
+
+        # Check cache
+        cache_key = f"synth:{symbol}:{','.join(include_categories)}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        prompt = f"""Conduct a COMPREHENSIVE analysis of ${symbol} by searching for posts from multiple finance perspectives on X.
+
+**KOLs TO SEARCH** (organized by category):
+{kol_reference}
+
+**SYNTHESIS TASK:**
+1. Search for recent posts about ${symbol} from each KOL
+2. Identify the BULL case (who's bullish and why)
+3. Identify the BEAR case (who's bearish and why)
+4. Note unusual signals (options flow, insider activity)
+5. Synthesize into actionable intelligence
+
+**FORMAT YOUR RESPONSE:**
+
+# ${symbol} - Multi-Perspective KOL Analysis
+
+## 🐂 Bull Case
+**Who's Bullish:**
+- [Name] (@handle): "[Quote/stance]" - [Key argument]
+- [Name] (@handle): "[Quote/stance]" - [Key argument]
+
+**Main Bull Arguments:**
+1. [Argument 1]
+2. [Argument 2]
+
+## 🐻 Bear Case
+**Who's Bearish:**
+- [Name] (@handle): "[Quote/stance]" - [Key argument]
+- [Name] (@handle): "[Quote/stance]" - [Key argument]
+
+**Main Bear Arguments:**
+1. [Argument 1]
+2. [Argument 2]
+
+## 📊 Options & Flow Signals
+[What options flow accounts are showing]
+
+## 📰 Media Narrative
+[What finance media is saying]
+
+## ⚠️ Short Seller Activity
+[Any short reports or bearish activism]
+
+## 🎯 Synthesis & Signal
+**Consensus View:** [Bullish/Bearish/Mixed]
+**Conviction Level:** [High/Medium/Low]
+**Key Debate:** [Main point of disagreement]
+**Contrarian Opportunity:** [What contrarians might argue]
+
+## 📌 Quotable Highlights
+1. "[Best bull quote]" - @handle
+2. "[Best bear quote]" - @handle
+3. "[Most insightful take]" - @handle
+
+**Data Quality Note:** [How recent/reliable are these takes]
+
+Be thorough but honest. If a KOL hasn't mentioned ${symbol} recently, note that."""
+
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": """You are Grok conducting comprehensive market intelligence research.
+Your job is to synthesize MULTIPLE perspectives into actionable intelligence.
+Be specific with @handles, quotes, and dates.
+Distinguish between high-credibility and low-credibility sources.
+Be honest about what you can and cannot find."""
+                },
+                {"role": "user", "content": prompt}
+            ],
+            "model": self.model,
+            "temperature": 0.3,
+            "max_tokens": 2500
+        }
+
+        try:
+            data = self._make_request(payload)
+            result = self._validate_response(data)
+            self._set_cache(cache_key, result)
+            return result
+        except Exception as e:
+            logger.error(f"Synthesis failed for {symbol}: {e}")
+            return ""
+
+    def deep_stock_research(
+        self,
+        symbol: str,
+        question: Optional[str] = None
+    ) -> str:
+        """
+        Conduct deep research on a stock combining multiple intelligence sources.
+        This is the most comprehensive research function.
+
+        Args:
+            symbol: Stock ticker symbol
+            question: Optional specific question to focus on
+
+        Returns:
+            Comprehensive research report with KOL insights
+        """
+        if not self.api_key:
+            return "Deep research requires XAI_API_KEY to access X/Twitter data."
+
+        # Identify relevant high-signal KOLs based on question
+        relevant_kols = []
+
+        # Always include top macro voices
+        for name in HIGH_SIGNAL_KOLS.get("institutional", []):
+            relevant_kols.append(name)
+
+        # Add topic-specific KOLs
+        if question:
+            q_lower = question.lower()
+            if any(w in q_lower for w in ["tech", "ai", "software", "chip", "semiconductor"]):
+                relevant_kols.extend(HIGH_SIGNAL_KOLS.get("tech_stocks", []))
+            if any(w in q_lower for w in ["options", "calls", "puts", "flow"]):
+                relevant_kols.extend(HIGH_SIGNAL_KOLS.get("options_flow", []))
+            if any(w in q_lower for w in ["short", "bear", "fraud"]):
+                relevant_kols.extend(HIGH_SIGNAL_KOLS.get("short_reports", []))
+            if any(w in q_lower for w in ["fed", "rates", "inflation", "macro"]):
+                relevant_kols.extend(HIGH_SIGNAL_KOLS.get("fed_policy", []))
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_kols = []
+        for k in relevant_kols:
+            if k not in seen:
+                seen.add(k)
+                unique_kols.append(k)
+
+        # Build KOL profiles for the prompt
+        kol_profiles_text = []
+        for name in unique_kols[:12]:  # Limit to 12 KOLs
+            profile = KOL_PROFILES.get(name, {})
+            kol_profiles_text.append(
+                f"- **{name}** ({profile.get('handle', '')}) - "
+                f"Category: {profile.get('category', 'unknown')}, "
+                f"Bias: {profile.get('bias', 'unknown')}, "
+                f"Signal: {profile.get('signal_quality', 'unknown')}"
+            )
+
+        kol_context = "\n".join(kol_profiles_text)
+
+        # Check cache
+        cache_key = f"deep:{symbol}:{(question or '')[:30]}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        question_context = f'\n**SPECIFIC QUESTION TO ADDRESS:** "{question}"' if question else ""
+
+        prompt = f"""Conduct DEEP RESEARCH on ${symbol} by searching X for insights from the most credible finance voices.
+{question_context}
+
+**HIGH-SIGNAL KOLs TO PRIORITIZE:**
+{kol_context}
+
+**RESEARCH OBJECTIVES:**
+1. Find what the smartest money is saying about ${symbol}
+2. Identify bulls vs bears with their specific arguments
+3. Detect any unusual signals (positioning, flow, insider activity)
+4. Synthesize into a clear investment thesis framework
+
+**COMPREHENSIVE RESEARCH REPORT:**
+
+# ${symbol} Deep Research Report
+
+## Executive Summary
+[2-3 sentence summary of the overall picture]
+
+## Smart Money Positioning
+**What institutions/hedge funds are doing:**
+- [Specific moves with @handles and details]
+
+## Bull Thesis (Who's Buying & Why)
+**Strongest Bull Voices:**
+1. **[Name]** (@handle): [Their bull case with quote]
+2. **[Name]** (@handle): [Their bull case with quote]
+
+**Key Catalysts Bulls See:**
+- [Catalyst 1]
+- [Catalyst 2]
+
+## Bear Thesis (Who's Selling & Why)
+**Strongest Bear Voices:**
+1. **[Name]** (@handle): [Their bear case with quote]
+2. **[Name]** (@handle): [Their bear case with quote]
+
+**Key Risks Bears Highlight:**
+- [Risk 1]
+- [Risk 2]
+
+## Technical & Flow Signals
+**Options Flow:** [What flow accounts show]
+**Gamma Levels:** [If mentioned]
+**Unusual Activity:** [Any notable patterns]
+
+## Sentiment Gauge
+- Institutional: [Bullish/Bearish/Neutral]
+- Retail: [Bullish/Bearish/Neutral]
+- Options Market: [Bullish/Bearish/Neutral]
+- Overall: [Bullish/Bearish/Mixed]
+
+## Key Debates & Controversies
+[What are people arguing about?]
+
+## Actionable Takeaways
+1. **If Bullish:** [What bulls should watch]
+2. **If Bearish:** [What bears should watch]
+3. **Key Levels:** [Important price levels mentioned]
+
+## Source Quality Assessment
+- **High Confidence:** [Well-sourced findings]
+- **Medium Confidence:** [Reasonable but less sourced]
+- **Speculation:** [Things to verify]
+
+---
+*Research based on X posts from the last 7 days*"""
+
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": """You are Grok, xAI's AI with real-time X access, conducting institutional-grade research.
+
+Your standards:
+1. SPECIFICITY - Names, @handles, dates, numbers
+2. HONESTY - Say what you can't find
+3. BALANCE - Show both sides fairly
+4. CREDIBILITY - Weight sources by their track record
+5. ACTIONABILITY - Make it useful for trading decisions
+
+Prioritize high-signal accounts over noise. Distinguish fact from opinion."""
+                },
+                {"role": "user", "content": prompt}
+            ],
+            "model": self.model,
+            "temperature": 0.25,  # Lower temp for research accuracy
+            "max_tokens": 3000
+        }
+
+        try:
+            data = self._make_request(payload)
+            result = self._validate_response(data)
+            self._set_cache(cache_key, result)
+            return result
+        except Exception as e:
+            logger.error(f"Deep research failed for {symbol}: {e}")
+            return f"Deep research failed: {str(e)[:50]}"
+
 
 # =============================================================================
 # STOCK CI DIMENSIONS - Keywords that indicate CI-relevant questions
@@ -784,6 +1456,69 @@ def get_stock_pulse(topic: str, api_key: Optional[str] = None) -> str:
 def get_known_kols() -> List[str]:
     """Return list of known stock/finance KOLs."""
     return STOCK_KOLS.copy()
+
+
+def get_kol_profiles() -> Dict[str, Dict]:
+    """Return KOL profiles with metadata."""
+    return KOL_PROFILES.copy()
+
+
+def get_kol_categories() -> Dict[str, List[str]]:
+    """Return KOL categories mapping."""
+    return KOL_CATEGORIES.copy()
+
+
+def get_high_signal_kols(topic: str) -> List[str]:
+    """Get high-signal KOLs for a specific topic."""
+    return HIGH_SIGNAL_KOLS.get(topic, []).copy()
+
+
+def deep_research(symbol: str, question: str = None, api_key: str = None) -> str:
+    """
+    Convenience function for deep stock research with KOL synthesis.
+
+    Args:
+        symbol: Stock ticker (e.g., "NVDA")
+        question: Optional specific question
+        api_key: Optional API key
+
+    Returns:
+        Comprehensive research report
+    """
+    service = get_grok_service(api_key)
+    return service.deep_stock_research(symbol, question)
+
+
+def synthesize_views(symbol: str, categories: List[str] = None, api_key: str = None) -> str:
+    """
+    Convenience function for multi-category KOL synthesis.
+
+    Args:
+        symbol: Stock ticker
+        categories: KOL categories to include
+        api_key: Optional API key
+
+    Returns:
+        Synthesized multi-perspective analysis
+    """
+    service = get_grok_service(api_key)
+    return service.synthesize_kol_views(symbol, categories)
+
+
+def search_category_kols(category: str, topic: str, api_key: str = None) -> str:
+    """
+    Search KOLs in a specific category about a topic.
+
+    Args:
+        category: KOL category (macro, tech_growth, options_flow, etc.)
+        topic: Topic to search
+        api_key: Optional API key
+
+    Returns:
+        Insights from category KOLs
+    """
+    service = get_grok_service(api_key)
+    return service.get_kol_by_category(category, topic)
 
 
 # =============================================================================

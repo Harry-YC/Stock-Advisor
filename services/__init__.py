@@ -24,6 +24,8 @@ from services.stock_data_service import (
     fetch_multi_stock_data,
     extract_tickers,
     build_expert_context,
+    build_kol_research_context,
+    get_category_insights,
     analyze_kol_screenshot,
     StockDataContext,
 )
@@ -37,8 +39,18 @@ from services.grok_service import (
     get_grok_service,
     detect_stock_ci_dimensions,
     get_stock_pulse,
+    get_known_kols,
+    get_kol_profiles,
+    get_kol_categories,
+    get_high_signal_kols,
+    deep_research,
+    synthesize_views,
+    search_category_kols,
     STOCK_KOLS,
     STOCK_CI_DIMENSIONS,
+    KOL_PROFILES,
+    KOL_CATEGORIES,
+    HIGH_SIGNAL_KOLS,
 )
 
 __all__ = [
@@ -47,6 +59,8 @@ __all__ = [
     'fetch_multi_stock_data',
     'extract_tickers',
     'build_expert_context',
+    'build_kol_research_context',
+    'get_category_insights',
     'analyze_kol_screenshot',
     'StockDataContext',
 
@@ -54,11 +68,25 @@ __all__ = [
     'LLMRouter',
     'get_llm_router',
 
-    # Grok/X
+    # Grok/X - Core
     'GrokService',
     'get_grok_service',
     'detect_stock_ci_dimensions',
     'get_stock_pulse',
+
+    # Grok/X - Enhanced KOL functions
+    'get_known_kols',
+    'get_kol_profiles',
+    'get_kol_categories',
+    'get_high_signal_kols',
+    'deep_research',
+    'synthesize_views',
+    'search_category_kols',
+
+    # Grok/X - Data
     'STOCK_KOLS',
     'STOCK_CI_DIMENSIONS',
+    'KOL_PROFILES',
+    'KOL_CATEGORIES',
+    'HIGH_SIGNAL_KOLS',
 ]

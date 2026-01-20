@@ -423,6 +423,7 @@ def build_expert_context(
     kol_content: Optional[str] = None,
     include_market_search: bool = False,
     include_grok: bool = False,
+    use_deep_research: bool = False,
 ) -> str:
     """
     Build comprehensive context for expert prompts.
@@ -433,6 +434,7 @@ def build_expert_context(
         kol_content: Optional KOL content being analyzed
         include_market_search: Include Google Search results
         include_grok: Include X/Twitter sentiment via Grok
+        use_deep_research: Use enhanced deep KOL research (recommended for detailed analysis)
 
     Returns:
         Formatted context string for expert prompts
@@ -451,26 +453,35 @@ def build_expert_context(
     if kol_content:
         context.kol_context = _sanitize_for_prompt(kol_content, max_length=800)
 
-    # If include_grok is True, also check for CI dimensions and add specific CI searches
+    # If include_grok is True, enhance with KOL insights
     if include_grok:
         grok_client = _get_grok_client()
         if grok_client and grok_client.is_available():
             try:
-                from services.grok_service import detect_stock_ci_dimensions
-                ci_dims = detect_stock_ci_dimensions(question)
-                if ci_dims:
-                    ci_results = []
-                    for dim in ci_dims[:2]:  # Limit to 2 dimensions to avoid API overuse
-                        ci_result = grok_client.competitive_intelligence_search(
-                            dim, context=f"{symbol}: {question}"
-                        )
-                        if ci_result and not ci_result.startswith("Error"):
-                            ci_results.append(f"### {dim.replace('_', ' ').title()}\n{ci_result}")
-                    if ci_results:
-                        context.grok_context += "\n\n" + "\n\n".join(ci_results)
-                        context.data_available['grok_ci'] = True
+                # Use deep research for comprehensive KOL synthesis
+                if use_deep_research:
+                    deep_result = grok_client.deep_stock_research(symbol, question)
+                    if deep_result and not deep_result.startswith("Error") and not deep_result.startswith("Deep research"):
+                        context.grok_context = deep_result
+                        context.data_available['grok_deep'] = True
+                        context.data_available['grok_kol_synthesis'] = True
+                else:
+                    # Standard CI dimension search
+                    from services.grok_service import detect_stock_ci_dimensions
+                    ci_dims = detect_stock_ci_dimensions(question)
+                    if ci_dims:
+                        ci_results = []
+                        for dim in ci_dims[:2]:  # Limit to 2 dimensions to avoid API overuse
+                            ci_result = grok_client.competitive_intelligence_search(
+                                dim, context=f"{symbol}: {question}"
+                            )
+                            if ci_result and not ci_result.startswith("Error"):
+                                ci_results.append(f"### {dim.replace('_', ' ').title()}\n{ci_result}")
+                        if ci_results:
+                            context.grok_context += "\n\n" + "\n\n".join(ci_results)
+                            context.data_available['grok_ci'] = True
             except Exception as e:
-                logger.error(f"Grok CI search failed: {e}")
+                logger.error(f"Grok search failed: {e}")
 
     # Build final context
     sections = [context.to_prompt_context()]
@@ -481,6 +492,64 @@ def build_expert_context(
         sections.append(f"\n*Data sources: {', '.join(available)}*")
 
     return "\n".join(sections)
+
+
+def build_kol_research_context(
+    symbol: str,
+    question: str = None,
+    categories: List[str] = None,
+) -> str:
+    """
+    Build context focused on KOL insights and synthesis.
+    This is optimized for getting diverse perspectives from finance KOLs.
+
+    Args:
+        symbol: Stock ticker symbol
+        question: Optional specific question
+        categories: KOL categories to include (default: balanced mix)
+
+    Returns:
+        Formatted KOL research context
+    """
+    grok_client = _get_grok_client()
+    if not grok_client or not grok_client.is_available():
+        return f"KOL research requires XAI_API_KEY. Set it to enable X/Twitter insights for ${symbol}."
+
+    try:
+        # Use synthesize_kol_views for multi-perspective analysis
+        result = grok_client.synthesize_kol_views(symbol, categories)
+        if result and not result.startswith("Error"):
+            return f"# KOL Research: ${symbol}\n\n{result}"
+        else:
+            return f"KOL research unavailable for ${symbol}."
+    except Exception as e:
+        logger.error(f"KOL research failed for {symbol}: {e}")
+        return f"KOL research failed: {str(e)[:50]}"
+
+
+def get_category_insights(
+    symbol: str,
+    category: str,
+) -> str:
+    """
+    Get insights from a specific KOL category about a stock.
+
+    Args:
+        symbol: Stock ticker
+        category: KOL category (macro, tech_growth, options_flow, etc.)
+
+    Returns:
+        Formatted insights from that category
+    """
+    grok_client = _get_grok_client()
+    if not grok_client or not grok_client.is_available():
+        return ""
+
+    try:
+        return grok_client.get_kol_by_category(category, f"${symbol}")
+    except Exception as e:
+        logger.error(f"Category insights failed: {e}")
+        return ""
 
 
 def search_why_stock_moved(symbol: str, direction: str = "moved") -> str:
