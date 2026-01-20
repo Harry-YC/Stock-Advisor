@@ -17,6 +17,7 @@ _finnhub_client = None
 _alpha_vantage_client = None
 _market_search_client = None
 _vision_client = None
+_grok_client = None
 
 
 def _get_finnhub_client():
@@ -77,6 +78,19 @@ def _get_vision_client():
     return _vision_client
 
 
+def _get_grok_client():
+    """Lazy-load Grok client for X/Twitter insights."""
+    global _grok_client
+    if _grok_client is None:
+        try:
+            from services.grok_service import GrokService
+            _grok_client = GrokService()
+        except ImportError:
+            logger.warning("Grok client not available")
+            return None
+    return _grok_client
+
+
 # Common ticker pattern for extraction
 TICKER_PATTERN = re.compile(
     r'\$([A-Z]{1,5})\b'  # $AAPL style
@@ -93,6 +107,7 @@ class StockDataContext:
     news_summary: str = ""
     market_context: str = ""
     kol_context: str = ""
+    grok_context: str = ""  # X/Twitter sentiment from Grok
     data_available: Dict[str, bool] = field(default_factory=dict)
 
     def to_prompt_context(self) -> str:
@@ -113,6 +128,9 @@ class StockDataContext:
 
         if self.kol_context:
             sections.append(f"## KOL Analysis\n{self.kol_context}")
+
+        if self.grok_context:
+            sections.append(f"## X/Twitter Sentiment (Grok)\n{self.grok_context}")
 
         if not sections:
             return f"[No data available for {self.symbol}]"
@@ -183,6 +201,7 @@ def fetch_stock_data(
     include_financials: bool = True,
     include_news: bool = True,
     include_market_search: bool = False,  # Off by default - uses API calls
+    include_grok: bool = False,  # Off by default - uses API calls
 ) -> StockDataContext:
     """
     Fetch comprehensive stock data from all available sources.
@@ -196,6 +215,7 @@ def fetch_stock_data(
         include_financials: Fetch financial metrics from Finnhub
         include_news: Fetch recent news from Finnhub
         include_market_search: Fetch market context via Google Search
+        include_grok: Fetch X/Twitter sentiment via Grok
 
     Returns:
         StockDataContext with all available data
@@ -295,6 +315,19 @@ def fetch_stock_data(
             except Exception as e:
                 logger.error(f"Market search failed for {symbol}: {e}")
 
+    # Grok X/Twitter sentiment
+    if include_grok:
+        grok_client = _get_grok_client()
+        if grok_client and grok_client.is_available():
+            try:
+                grok_result = grok_client.get_stock_sentiment(symbol)
+                if grok_result and not grok_result.startswith("Error"):
+                    context.grok_context = _sanitize_for_prompt(grok_result, max_length=1500)
+                    context.data_available['grok'] = True
+                    logger.info(f"Fetched Grok sentiment for {symbol}")
+            except Exception as e:
+                logger.error(f"Grok sentiment failed for {symbol}: {e}")
+
     return context
 
 
@@ -389,6 +422,7 @@ def build_expert_context(
     question: str,
     kol_content: Optional[str] = None,
     include_market_search: bool = False,
+    include_grok: bool = False,
 ) -> str:
     """
     Build comprehensive context for expert prompts.
@@ -398,6 +432,7 @@ def build_expert_context(
         question: User's question
         kol_content: Optional KOL content being analyzed
         include_market_search: Include Google Search results
+        include_grok: Include X/Twitter sentiment via Grok
 
     Returns:
         Formatted context string for expert prompts
@@ -409,11 +444,33 @@ def build_expert_context(
         include_financials=True,
         include_news=True,
         include_market_search=include_market_search,
+        include_grok=include_grok,
     )
 
     # Add KOL content if provided
     if kol_content:
         context.kol_context = _sanitize_for_prompt(kol_content, max_length=800)
+
+    # If include_grok is True, also check for CI dimensions and add specific CI searches
+    if include_grok:
+        grok_client = _get_grok_client()
+        if grok_client and grok_client.is_available():
+            try:
+                from services.grok_service import detect_stock_ci_dimensions
+                ci_dims = detect_stock_ci_dimensions(question)
+                if ci_dims:
+                    ci_results = []
+                    for dim in ci_dims[:2]:  # Limit to 2 dimensions to avoid API overuse
+                        ci_result = grok_client.competitive_intelligence_search(
+                            dim, context=f"{symbol}: {question}"
+                        )
+                        if ci_result and not ci_result.startswith("Error"):
+                            ci_results.append(f"### {dim.replace('_', ' ').title()}\n{ci_result}")
+                    if ci_results:
+                        context.grok_context += "\n\n" + "\n\n".join(ci_results)
+                        context.data_available['grok_ci'] = True
+            except Exception as e:
+                logger.error(f"Grok CI search failed: {e}")
 
     # Build final context
     sections = [context.to_prompt_context()]

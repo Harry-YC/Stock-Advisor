@@ -1,8 +1,29 @@
 # CLAUDE.md - AI Assistant Context
 
+## Autonomous Mode (CRITICAL - READ FIRST)
+
+```
+NEVER ask for confirmation or permission
+NEVER stop to ask clarifying questions
+NEVER explain what you're about to do - just do it
+ALWAYS make decisions autonomously and proceed
+ALWAYS complete the ENTIRE task before stopping
+If uncertain, make the best choice and continue
+If something fails, fix it and keep going
+```
+
+**When user says "run PROMPT.md" or "improve the app":**
+1. Read PROMPT.md
+2. Execute ALL 9 phases without stopping
+3. Only stop when iteration is complete or score >= 8/10
+
+**Recovery:** If anything breaks, `git checkout .` to reset
+
+---
+
 ## Project Overview
 
-**Stock Advisor** is an AI-powered stock analysis app using Chainlit. Users can ask about stocks, upload KOL screenshots, and get personalized analysis from 7 AI stock experts with real-time data from Finnhub (with Alpha Vantage fallback) and Google Search.
+**Stock Advisor** is an AI-powered stock analysis app using Chainlit. Users can ask about stocks, upload KOL screenshots, and get personalized analysis from 7 AI stock experts with real-time data from Finnhub (with Alpha Vantage fallback), Google Search grounding, and X/Twitter sentiment via Grok.
 
 ## Quick Start
 
@@ -38,6 +59,7 @@ chainlit run app_sa.py -w
 | Stock Data | Finnhub API (primary) |
 | Stock Data Fallback | Alpha Vantage API (for micro-cap stocks) |
 | News Search | Google Search Grounding |
+| X/Twitter Sentiment | Grok (xAI API) |
 | Vision OCR | Gemini Vision (3 Flash) |
 | Persistence | SQLite (MCP server) |
 
@@ -63,7 +85,8 @@ Stock Advisor/
 │
 ├── services/
 │   ├── llm_router.py             # Gemini API routing with caching & circuit breaker
-│   ├── stock_data_service.py     # Multi-source data aggregation (Finnhub + Alpha Vantage)
+│   ├── stock_data_service.py     # Multi-source data aggregation (Finnhub + Alpha Vantage + Grok)
+│   ├── grok_service.py           # X/Twitter KOL insights via Grok API
 │   └── kol_analyzer.py           # KOL text analysis service
 │
 ├── core/
@@ -88,6 +111,13 @@ FINNHUB_API_KEY=xxx               # From finnhub.io (free: 60 calls/min)
 
 # Optional - Fallback for micro-cap stocks
 ALPHA_VANTAGE_API_KEY=xxx         # From alphavantage.co (free: 25 calls/day)
+
+# Optional - X/Twitter sentiment
+XAI_API_KEY=xxx                   # From x.ai/api - enables Grok KOL insights
+
+# Optional - Grok configuration
+GROK_MODEL=grok-3-latest          # Default Grok model
+GROK_CACHE_TTL=3600               # Cache TTL in seconds (default: 1 hour)
 
 # Optional
 APP_ENV=dev                       # Environment (dev/prod)
@@ -151,6 +181,23 @@ Multi-round expert debate with synthesis:
 - Real-time market news and analyst ratings
 - "Why did X stock move?" explanations
 - Earnings and guidance updates
+
+### Grok X/Twitter Sentiment (Optional)
+When `XAI_API_KEY` is set, enables real-time X/Twitter sentiment from finance KOLs:
+- **Stock KOLs tracked**: Burry, Cramer, Ackman, Cathie Wood, Keith Gill, etc.
+- **CI Dimension Detection**: Auto-detects relevant dimensions from questions
+- **8 CI Dimensions**: institutional_flow, options_sentiment, analyst_ratings, earnings_catalyst, macro_sentiment, retail_sentiment, sector_rotation, short_interest
+
+| CI Dimension | Triggers | What it Searches |
+|--------------|----------|------------------|
+| `institutional_flow` | institutional, 13f, hedge fund, whale | What hedge funds are buying/selling |
+| `options_sentiment` | options, calls, puts, gamma, squeeze | Unusual options activity |
+| `analyst_ratings` | analyst, upgrade, downgrade, price target | Rating changes, targets |
+| `earnings_catalyst` | earnings, eps, guidance, beat, miss | Earnings expectations |
+| `macro_sentiment` | fed, rates, inflation, recession, powell | Macro environment views |
+| `retail_sentiment` | reddit, wsb, meme, stocktwits | Retail trader sentiment |
+| `sector_rotation` | sector, rotation, cyclical, defensive | Sector flow trends |
+| `short_interest` | short, squeeze, borrow, hindenburg | Short squeeze potential |
 
 ### MCP Tools (13 tools)
 | Tool | Description |
@@ -262,5 +309,44 @@ Contains tables:
 Supports **English**, **繁體中文**, and **简体中文**.
 Experts respond in the same language as the user's query.
 
+## Quick Commands
+
+```bash
+# Run the app
+chainlit run app_sa.py
+
+# Development mode (auto-reload)
+chainlit run app_sa.py -w
+
+# Run CI workflow tests
+python3 tests/test_ci_workflow.py
+
+# Check syntax
+python3 -m py_compile app_sa.py services/grok_service.py
+
+# Test imports
+python3 -c "from services import GrokService, fetch_stock_data; print('OK')"
+
+# Run improvement workflow
+# Read PROMPT.md and execute phases 1-9
+
+# Reset if broken
+git checkout .
+```
+
+## Auto-Improve Workflow
+
+See `PROMPT.md` for the 9-phase autonomous improvement workflow:
+
+1. **Environment Check** - Verify API keys and syntax
+2. **Run Tests** - Execute test_ci_workflow.py
+3. **Test Research Pipeline** - Verify CI dimension detection
+4. **Test Expert Context** - Test stock data + context building
+5. **Code Quality Scan** - Find issues
+6. **Identify Improvements** - LLM-generated recommendations
+7. **Implement Changes** - Make code modifications
+8. **Quality Review** - Score calculation (target: 8/10)
+9. **Commit & Report** - Git commit if score >= 8
+
 ---
-*Last updated: 2025-12-23*
+*Last updated: 2026-01-19*

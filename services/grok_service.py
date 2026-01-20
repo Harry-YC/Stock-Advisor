@@ -1,0 +1,807 @@
+"""
+Grok Service for Stock Advisor
+
+Interact with xAI API to fetch real-time KOL insights from X.
+Optimized for stock/finance topics and trading sentiment.
+"""
+
+import os
+import json
+import time
+import logging
+import hashlib
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
+import requests
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+GROK_MODELS = {
+    "default": "grok-3-latest",
+    "fast": "grok-3-fast",
+    "beta": "grok-beta",
+}
+
+# Stock/Finance KOLs and influencers to monitor
+STOCK_KOLS = [
+    # Macro Strategists
+    "Michael Burry", "Jim Cramer", "Stan Druckenmiller", "Ray Dalio",
+    "Bill Ackman", "Howard Marks", "Mohamed El-Erian",
+    # Retail-Influential
+    "Keith Gill", "Chamath Palihapitiya", "Cathie Wood", "Tom Lee",
+    "Josh Brown", "Barry Ritholtz",
+    # Finance Media
+    "Joe Weisenthal", "Matt Levine", "Jesse Felder", "Kyla Scanlon",
+    # Tech Analysts
+    "Gene Munster", "Dan Ives", "Beth Kindig",
+]
+
+# X handles for direct search (when names don't match handles)
+STOCK_HANDLES = {
+    "Michael Burry": "@michaeljburry",
+    "Jim Cramer": "@jimcramer",
+    "Keith Gill": "@TheRoaringKitty",
+    "Cathie Wood": "@CathieDWood",
+    "Bill Ackman": "@BillAckman",
+    "Josh Brown": "@ReformedBroker",
+    "Chamath Palihapitiya": "@chaaborst",
+    "Ray Dalio": "@RayDalio",
+    "Stan Druckenmiller": "@standruckenmiller",
+    "Mohamed El-Erian": "@elerianm",
+    "Barry Ritholtz": "@ritholtz",
+    "Tom Lee": "@fundstrat",
+    "Joe Weisenthal": "@TheStalwart",
+    "Matt Levine": "@mattlevine",
+    "Kyla Scanlon": "@kaborostfiscal",
+    "Gene Munster": "@munaboroster",
+    "Dan Ives": "@DivesTech",
+    "Beth Kindig": "@Beth_Kindig",
+}
+
+# Topics relevant to stock/trading ecosystem
+STOCK_TOPICS = [
+    # Market Sentiment
+    "bull market", "bear market", "correction", "rally", "selloff",
+    "market crash", "all-time high", "buy the dip",
+    # Options & Derivatives
+    "calls", "puts", "gamma squeeze", "short squeeze", "VIX",
+    "options flow", "unusual options activity",
+    # Fundamentals
+    "earnings", "EPS", "revenue", "guidance", "beat", "miss",
+    "PE ratio", "valuation", "overvalued", "undervalued",
+    # Macro
+    "Fed", "interest rates", "inflation", "recession",
+    "Powell", "FOMC", "rate cut", "rate hike",
+    # Sectors
+    "tech stocks", "AI stocks", "semiconductor", "biotech",
+    "energy", "financials", "consumer",
+    # Retail Trading
+    "WSB", "WallStreetBets", "diamond hands", "YOLO",
+    "meme stock", "retail traders", "hedge fund",
+]
+
+
+# =============================================================================
+# DATA CLASSES
+# =============================================================================
+
+@dataclass
+class GrokInsightResult:
+    """Result from Grok KOL insights query."""
+    topic: str
+    insights: str
+    kols_mentioned: List[str]
+    sentiment: str  # bullish, bearish, mixed, neutral
+    timestamp: float
+    cached: bool = False
+
+    def format_summary(self) -> str:
+        """Format for display."""
+        sentiment_emoji = {
+            "bullish": "🟢",
+            "bearish": "🔴",
+            "mixed": "🟡",
+            "neutral": "⚪",
+        }.get(self.sentiment, "⚪")
+
+        header = f"{sentiment_emoji} **X/Twitter Sentiment: {self.sentiment.upper()}**\n\n"
+        return header + self.insights
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "topic": self.topic,
+            "insights": self.insights,
+            "kols_mentioned": self.kols_mentioned,
+            "sentiment": self.sentiment,
+            "timestamp": self.timestamp,
+            "cached": self.cached,
+        }
+
+
+# =============================================================================
+# GROK SERVICE
+# =============================================================================
+
+class GrokService:
+    """
+    Service for fetching real-time KOL insights from X via xAI's Grok API.
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = "default",
+        max_retries: int = 3,
+        timeout: int = 60
+    ):
+        self.api_key = api_key or os.getenv("XAI_API_KEY")
+        self.base_url = "https://api.x.ai/v1"
+        self.model = GROK_MODELS.get(model, GROK_MODELS["default"])
+        self.max_retries = max_retries
+        self.timeout = timeout
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "3600"))  # 1 hour cache
+        self._cache_file = os.path.join(os.getcwd(), ".grok_cache_stock.json")
+
+        # Load cache from disk
+        self._load_cache()
+
+        if not self.api_key:
+            logger.warning("No XAI_API_KEY provided or found in environment.")
+
+    def is_available(self) -> bool:
+        """Check if service is available."""
+        return bool(self.api_key)
+
+    def _load_cache(self):
+        """Load cache from disk."""
+        try:
+            if os.path.exists(self._cache_file):
+                with open(self._cache_file, 'r') as f:
+                    self._cache = json.load(f)
+                logger.info(f"Loaded {len(self._cache)} cached Grok queries.")
+        except Exception as e:
+            logger.warning(f"Failed to load Grok cache: {e}")
+            self._cache = {}
+
+    def _save_cache(self):
+        """Save cache to disk."""
+        try:
+            with open(self._cache_file, 'w') as f:
+                json.dump(self._cache, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Failed to save Grok cache: {e}")
+
+    def _get_cache_key(self, topic: str) -> str:
+        """Generate cache key for a topic."""
+        return hashlib.md5(topic.lower().encode()).hexdigest()
+
+    def _get_cached(self, topic: str) -> Optional[str]:
+        """Get cached result if still valid."""
+        key = self._get_cache_key(topic)
+        if key in self._cache:
+            cached = self._cache[key]
+            if time.time() - cached['timestamp'] < self._cache_ttl:
+                logger.info(f"Cache hit for topic: {topic[:30]}...")
+                return cached['result']
+            else:
+                logger.info(f"Cache expired for topic: {topic[:30]}...")
+                del self._cache[key]
+                self._save_cache()
+        return None
+
+    def _set_cache(self, topic: str, result: str):
+        """Cache a result."""
+        key = self._get_cache_key(topic)
+        self._cache[key] = {
+            'result': result,
+            'timestamp': time.time()
+        }
+        self._save_cache()
+
+    def _make_request(self, payload: Dict) -> Dict[str, Any]:
+        """Make API request with retry logic."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                response = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
+
+                # Handle rate limiting
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', 5))
+                    logger.warning(f"Rate limited. Waiting {retry_after}s...")
+                    time.sleep(retry_after)
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except requests.exceptions.Timeout:
+                last_error = "Request timed out"
+                logger.warning(f"Timeout on attempt {attempt + 1}/{self.max_retries}")
+
+            except requests.exceptions.ConnectionError:
+                last_error = "Connection failed"
+                logger.warning(f"Connection error on attempt {attempt + 1}/{self.max_retries}")
+
+            except requests.exceptions.HTTPError as e:
+                last_error = f"HTTP {e.response.status_code}: {e.response.text[:100]}"
+                logger.error(f"HTTP error: {last_error}")
+                # Don't retry on 4xx errors (except 429)
+                if 400 <= e.response.status_code < 500:
+                    break
+
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"Unexpected error: {e}")
+
+            # Exponential backoff
+            if attempt < self.max_retries - 1:
+                wait_time = 2 ** attempt
+                time.sleep(wait_time)
+
+        raise Exception(f"API request failed after {self.max_retries} attempts: {last_error}")
+
+    def _validate_response(self, data: Dict) -> str:
+        """Validate and extract content from API response."""
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected dict response, got {type(data)}")
+
+        choices = data.get('choices')
+        if not choices or not isinstance(choices, list):
+            raise ValueError("Response missing 'choices' array")
+
+        if len(choices) == 0:
+            raise ValueError("Response 'choices' array is empty")
+
+        message = choices[0].get('message')
+        if not message or not isinstance(message, dict):
+            raise ValueError("Response missing 'message' object")
+
+        content = message.get('content')
+        if not content or not isinstance(content, str):
+            raise ValueError("Response missing 'content' string")
+
+        return content.strip()
+
+    def get_kol_insights(
+        self,
+        topic: str,
+        focus_area: str = "stock_trading",
+        include_kol_list: bool = True
+    ) -> str:
+        """
+        Query Grok to get KOL insights from X about a specific stock/trading topic.
+
+        Args:
+            topic: The topic to search for (e.g., stock ticker, market event)
+            focus_area: Focus area for context (stock_trading, macro, options, etc.)
+            include_kol_list: Whether to specifically search for known KOLs
+
+        Returns:
+            Formatted KOL insights string
+        """
+        if not self.api_key:
+            return "No xAI API Key provided. Add XAI_API_KEY to enable X/Twitter sentiment."
+
+        # Check cache first
+        cache_key = f"{topic}:{focus_area}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        # Build KOL-specific search context with handles
+        kol_context = ""
+        if include_kol_list:
+            kol_list = []
+            for name in STOCK_KOLS[:15]:
+                handle = STOCK_HANDLES.get(name, "")
+                if handle:
+                    kol_list.append(f"{name} ({handle})")
+                else:
+                    kol_list.append(name)
+            kol_names = ", ".join(kol_list)
+            kol_context = f"""
+**PRIORITY KOLs to search** (check their recent posts):
+{kol_names}
+
+Also search for posts from: hedge fund managers, financial analysts, options traders, macro strategists, finance journalists, retail trading communities.
+"""
+
+        # Build topic-specific context
+        topic_keywords = ", ".join(STOCK_TOPICS)
+
+        # Enhanced prompt for stock/trading ecosystem
+        prompt = f"""Search X (Twitter) comprehensively for recent high-engagement posts about: "{topic}"
+
+{kol_context}
+
+**SEARCH ACROSS THE STOCK/TRADING ECOSYSTEM:**
+- Institutional activity and 13F filings
+- Options flow and unusual activity
+- Analyst ratings and price targets
+- Earnings expectations and guidance
+- Macro factors and Fed commentary
+- Retail sentiment and social trends
+- Short interest and squeeze potential
+
+Related keywords and hashtags: {topic_keywords}, #stocks, #trading, #investing, #options, #earnings
+
+**IMPORTANT**: Find at least 5-8 different voices with diverse perspectives (bulls vs bears, institutions vs retail, long-term vs traders).
+
+Your task: Create a comprehensive "MARKET PULSE" briefing for trading decisions.
+
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+
+## Key Narratives (What Traders/Analysts Are Saying)
+- **[Narrative 1]**: [Name] (@handle) - "[Specific quote]" (date if known)
+- **[Narrative 2]**: [Name] (@handle) - "[Specific quote]"
+- **[Narrative 3]**: [Name] (@handle) - "[Specific quote]"
+(Include at least 4-5 different voices)
+
+## Hot Takes & Debates
+- **[Debate 1]**: [Who's bullish vs bearish and why]
+- **[Debate 2]**: [Key disagreements]
+(Include bulls AND bears - who's buying? who's selling?)
+
+## Sentiment Snapshot
+- Overall tone: [Bullish/Bearish/Mixed/Cautious]
+- Institutional stance: [Buying/Selling/Holding]
+- Retail sentiment: [FOMO/Fear/Neutral]
+- Key concerns: [List 2-3 main risks]
+- Key catalysts: [What could move the stock?]
+
+## Trading Implications
+- [Short-term outlook]
+- [Key levels to watch]
+- [What contrarians are saying]
+
+## Quotable Moments (for reference)
+- "[Quote 1]" - @handle (Name)
+- "[Quote 2]" - @handle (Name)
+- "[Quote 3]" - @handle (Name)
+
+Be thorough and specific. Use real names and handles. Include dates when possible. Show diverse perspectives.
+"""
+
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": """You are Grok, xAI's AI with real-time access to X (Twitter) data.
+
+Your specialty: Capturing the pulse of Finance Twitter - the traders, analysts, debates, and sentiment.
+
+Rules:
+1. Be SPECIFIC - names, handles, approximate dates
+2. Be HONEST - if you can't find recent posts, say so
+3. Be RELEVANT - focus on posts from the last 7 days when possible
+4. Be BALANCED - show multiple perspectives, not just hype or doom"""
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "model": self.model,
+            "stream": False,
+            "temperature": 0.4,
+            "max_tokens": 2000
+        }
+
+        try:
+            data = self._make_request(payload)
+            result = self._validate_response(data)
+
+            # Cache the result
+            self._set_cache(cache_key, result)
+
+            return result
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Error in get_kol_insights: {error_msg}")
+
+            # Return helpful error message
+            if "401" in error_msg:
+                return "Grok API Error: Invalid API key. Please check your xAI API key."
+            elif "429" in error_msg:
+                return "Grok API Error: Rate limited. Please try again in a few minutes."
+            elif "timeout" in error_msg.lower():
+                return "Grok API Error: Request timed out. X might be slow - try again."
+            else:
+                return f"Grok API Error: {error_msg[:100]}"
+
+    def get_stock_sentiment(self, symbol: str) -> str:
+        """
+        Get trading sentiment for a specific stock ticker.
+        """
+        if not self.api_key:
+            return "No API key"
+
+        prompt = f"""Search X for recent trader and investor commentary on ${symbol}.
+
+Summarize:
+1. Overall sentiment (bullish/bearish/mixed)
+2. Key bull arguments
+3. Key bear arguments
+4. Notable price targets mentioned
+5. Any unusual activity (options flow, short interest)
+
+Focus on posts from known traders, analysts, and finance accounts."""
+
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are Grok with real-time X access. Focus on stock trading voices."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": self.model,
+            "temperature": 0.3,
+            "max_tokens": 1000
+        }
+
+        try:
+            data = self._make_request(payload)
+            return self._validate_response(data)
+        except Exception as e:
+            return f"Error: {str(e)[:50]}"
+
+    def search_and_summarize(self, query: str) -> str:
+        """
+        General search and summarize function for arbitrary queries.
+        """
+        if not self.api_key:
+            return "No API key"
+
+        prompt = f"""Search X and summarize findings for: {query}
+
+Provide:
+1. Key findings with sources
+2. Expert opinions (with @handles)
+3. Any controversies or debates
+4. Confidence assessment
+
+Be specific and cite sources."""
+
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are Grok. Search X and summarize findings with sources."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": self.model,
+            "temperature": 0.3,
+            "max_tokens": 1500
+        }
+
+        try:
+            data = self._make_request(payload)
+            return self._validate_response(data)
+        except Exception as e:
+            return f"Error: {str(e)[:50]}"
+
+    def competitive_intelligence_search(self, dimension: str, context: str = "") -> str:
+        """
+        Search X for stock market competitive intelligence on a specific dimension.
+
+        Dimensions:
+        - institutional_flow: What institutions are doing (13F, hedge fund moves)
+        - options_sentiment: Options flow, gamma exposure, unusual activity
+        - analyst_ratings: Upgrades, downgrades, price targets
+        - earnings_catalyst: Earnings expectations, guidance, beat/miss history
+        - macro_sentiment: Fed, rates, inflation, recession risk
+        - retail_sentiment: WSB, retail traders, social trends
+        - sector_rotation: Sector movements, cyclical vs defensive
+        - short_interest: Short squeezes, borrow rates, bears
+
+        Args:
+            dimension: The CI dimension to search
+            context: Optional additional context (e.g., specific tickers)
+
+        Returns:
+            Formatted competitive intelligence findings
+        """
+        if not self.api_key:
+            return ""
+
+        # Check cache
+        cache_key = f"ci:{dimension}:{context[:50]}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        dimension_prompts = {
+            "institutional_flow": f"""Search X for INSTITUTIONAL ACTIVITY in stocks:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **13F Filings**: What did Burry, Ackman, Druckenmiller buy/sell?
+2. **Hedge Fund Moves**: Large position changes, new stakes, exits
+3. **Smart Money**: What are institutions accumulating vs distributing?
+4. **Whale Activity**: Large block trades, dark pool prints
+5. **Insider Trading**: Notable insider buys or sells
+
+Find SPECIFIC intel:
+- Fund names and position sizes
+- Entry/exit prices when mentioned
+- @handles and dates
+
+Search terms: 13F filing, hedge fund position, smart money, institutional buying, whale alert""",
+
+            "options_sentiment": f"""Search X for OPTIONS FLOW and sentiment:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **Unusual Options Activity**: Large premium, unusual strikes
+2. **Gamma Exposure**: GEX levels, gamma squeeze potential
+3. **Put/Call Ratios**: Extreme readings, sentiment shift
+4. **Sweep Orders**: Aggressive buying patterns
+5. **VIX Commentary**: Volatility expectations
+
+Find SPECIFIC examples:
+- Strike prices and expiration dates
+- Premium amounts
+- Bullish vs bearish flow
+- @handles from options traders
+
+Search terms: options flow, unusual activity, gamma squeeze, calls, puts, VIX""",
+
+            "analyst_ratings": f"""Search X for ANALYST RATINGS and price targets:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **Upgrades/Downgrades**: Recent rating changes
+2. **Price Targets**: New targets, raised vs lowered
+3. **Initiation Coverage**: New analyst coverage
+4. **Research Notes**: Key findings from reports
+5. **Analyst Debates**: Disagreements on valuations
+
+Find SPECIFIC examples:
+- Analyst names and firms
+- Price targets with upside/downside
+- Rating changes with rationale
+- @handles of research accounts
+
+Search terms: analyst upgrade, price target, rating change, Wall Street analyst""",
+
+            "earnings_catalyst": f"""Search X for EARNINGS expectations and catalysts:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **Earnings Whisper**: What traders expect vs consensus
+2. **Guidance Focus**: What management will say
+3. **Beat/Miss History**: Track record patterns
+4. **Key Metrics**: What numbers matter most
+5. **Post-Earnings Moves**: Historical reaction patterns
+
+Find SPECIFIC intel:
+- EPS/revenue expectations
+- Key metrics to watch
+- Historical patterns
+- Trader positioning
+
+Search terms: earnings, EPS, revenue, guidance, beat, miss, quarter""",
+
+            "macro_sentiment": f"""Search X for MACRO sentiment and Fed commentary:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **Fed Commentary**: Powell, FOMC, rate expectations
+2. **Inflation Views**: Hot/cold CPI, PCE reactions
+3. **Recession Odds**: Hard landing vs soft landing
+4. **Rate Expectations**: Cuts vs hikes, timing
+5. **Economic Data**: Jobs, GDP, housing
+
+Find SPECIFIC insights:
+- Rate probabilities mentioned
+- Economic forecasts
+- @handles from macro voices (El-Erian, Dalio, etc.)
+
+Search terms: Fed, Powell, rate cut, inflation, recession, FOMC""",
+
+            "retail_sentiment": f"""Search X for RETAIL SENTIMENT and social trends:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **WSB Activity**: WallStreetBets top plays
+2. **Meme Stocks**: Trending tickers in retail
+3. **FOMO Indicators**: Retail chasing patterns
+4. **Fear Gauges**: Panic selling signs
+5. **Social Volume**: Trending tickers, mentions
+
+Find SPECIFIC examples:
+- Trending tickers
+- Sentiment shift indicators
+- Reddit/Twitter hype levels
+- Contrarian signals
+
+Search terms: WSB, WallStreetBets, retail traders, meme stock, diamond hands, YOLO""",
+
+            "sector_rotation": f"""Search X for SECTOR ROTATION and trends:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **Hot Sectors**: What's leading the market
+2. **Cold Sectors**: What's lagging, underperforming
+3. **Rotation Signals**: Money moving between sectors
+4. **Cyclical vs Defensive**: Risk-on vs risk-off
+5. **Theme Plays**: AI, energy, infrastructure
+
+Find SPECIFIC examples:
+- Sector ETF flows
+- Relative performance data
+- Rotation triggers
+- @handles of sector analysts
+
+Search terms: sector rotation, tech sector, energy stocks, defensive, cyclical, growth vs value""",
+
+            "short_interest": f"""Search X for SHORT INTEREST and squeeze potential:
+
+{f'Specific focus: {context}' if context else ''}
+
+Look for:
+1. **High Short Interest**: Most shorted stocks
+2. **Squeeze Candidates**: Days to cover, utilization
+3. **Short Reports**: Hindenburg, Muddy Waters, etc.
+4. **Borrow Rates**: Hard to borrow signals
+5. **Short Covering**: Squeeze in progress
+
+Find SPECIFIC examples:
+- Short interest percentages
+- Days to cover
+- Borrow rates
+- Short report targets
+
+Search terms: short interest, short squeeze, borrow rate, short report, Hindenburg"""
+        }
+
+        prompt = dimension_prompts.get(dimension, dimension_prompts["institutional_flow"])
+
+        prompt += """
+
+FORMAT YOUR RESPONSE:
+
+## Key Findings
+[Most important discoveries - be specific with names, numbers, dates]
+
+## Notable Voices
+[Who's saying what - include @handles and quotes]
+
+## Trading Implications
+[What this means for trading decisions]
+
+Be SPECIFIC. Include @handles, dates, numbers, price levels. Distinguish fact from speculation."""
+
+        payload = {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": """You are Grok with real-time X access, conducting market intelligence research for traders.
+Be specific and actionable. Include @handles, dates, numbers.
+Distinguish between confirmed facts and speculation.
+Focus on the last 7 days when possible."""
+                },
+                {"role": "user", "content": prompt}
+            ],
+            "model": self.model,
+            "temperature": 0.3,
+            "max_tokens": 2000
+        }
+
+        try:
+            data = self._make_request(payload)
+            result = self._validate_response(data)
+            self._set_cache(cache_key, result)
+            return result
+        except Exception as e:
+            logger.error(f"CI search failed for {dimension}: {e}")
+            return ""
+
+
+# =============================================================================
+# STOCK CI DIMENSIONS - Keywords that indicate CI-relevant questions
+# =============================================================================
+
+STOCK_CI_DIMENSIONS = {
+    "institutional_flow": ["institutional", "13f", "hedge fund", "smart money", "whale", "insider"],
+    "options_sentiment": ["options", "calls", "puts", "gamma", "squeeze", "vix", "flow"],
+    "analyst_ratings": ["analyst", "upgrade", "downgrade", "price target", "rating", "coverage"],
+    "earnings_catalyst": ["earnings", "eps", "guidance", "beat", "miss", "quarter", "revenue"],
+    "macro_sentiment": ["fed", "rates", "inflation", "recession", "powell", "fomc", "macro"],
+    "retail_sentiment": ["reddit", "wsb", "retail", "meme", "stocktwits", "wallstreetbets", "fomo"],
+    "sector_rotation": ["sector", "rotation", "cyclical", "defensive", "growth", "value"],
+    "short_interest": ["short", "squeeze", "borrow", "utilization", "hindenburg", "citron"],
+}
+
+
+def detect_stock_ci_dimensions(question: str) -> List[str]:
+    """
+    Detect which CI dimensions are relevant based on question keywords.
+
+    Args:
+        question: The user's question
+
+    Returns:
+        List of relevant dimension names
+    """
+    q_lower = question.lower()
+    dimensions = []
+
+    for dimension, triggers in STOCK_CI_DIMENSIONS.items():
+        if any(trigger in q_lower for trigger in triggers):
+            dimensions.append(dimension)
+
+    return dimensions
+
+
+# =============================================================================
+# CONVENIENCE FUNCTIONS
+# =============================================================================
+
+_grok_service_instance = None
+
+
+def get_grok_service(api_key: Optional[str] = None) -> GrokService:
+    """
+    Get singleton instance of GrokService.
+    """
+    global _grok_service_instance
+    if _grok_service_instance is None:
+        _grok_service_instance = GrokService(api_key=api_key)
+    return _grok_service_instance
+
+
+def get_stock_pulse(topic: str, api_key: Optional[str] = None) -> str:
+    """
+    Quick function to get trader/investor pulse for stock topics.
+    """
+    service = get_grok_service(api_key)
+    return service.get_kol_insights(topic, focus_area="stock_trading")
+
+
+def get_known_kols() -> List[str]:
+    """Return list of known stock/finance KOLs."""
+    return STOCK_KOLS.copy()
+
+
+# =============================================================================
+# TEST
+# =============================================================================
+
+if __name__ == "__main__":
+    print("Testing Grok Service for Stock Advisor...")
+
+    service = GrokService()
+
+    if service.api_key:
+        print(f"Model: {service.model}")
+        print(f"Max retries: {service.max_retries}")
+        print("\nFetching KOL insights for 'NVDA AI semiconductor'...")
+        print("-" * 50)
+        result = service.get_kol_insights("NVDA AI semiconductor")
+        print(result)
+    else:
+        print("Skipping test: No XAI_API_KEY found")
+        print("\nTo test, set: export XAI_API_KEY=your-key")

@@ -89,6 +89,17 @@ DEBATE_EXPERT_TIMEOUT = int(os.getenv("DEBATE_EXPERT_TIMEOUT", "60"))  # Per exp
 MODERATOR_MODEL = os.getenv("MODERATOR_MODEL", "gemini-3-pro-preview")
 
 # =============================================================================
+# GROK/xAI API (X/Twitter KOL Insights)
+# =============================================================================
+
+# xAI API for Grok (real-time X/Twitter sentiment)
+# Register at: https://x.ai/api
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+ENABLE_GROK = bool(XAI_API_KEY)
+GROK_MODEL = os.getenv("GROK_MODEL", "grok-3-latest")
+GROK_CACHE_TTL = int(os.getenv("GROK_CACHE_TTL", "3600"))
+
+# =============================================================================
 # STOCK API CONFIGURATION
 # =============================================================================
 
@@ -169,6 +180,9 @@ def validate_config():
     if not FINNHUB_API_KEY:
         warnings.append("FINNHUB_API_KEY not set - real-time stock data disabled")
 
+    if not ENABLE_GROK:
+        warnings.append("XAI_API_KEY not set - X/Twitter KOL insights disabled (optional)")
+
     if not ENABLE_EMAIL_ALERTS:
         warnings.append("Email alerts not configured (SMTP_USER, SMTP_PASSWORD, ALERT_EMAIL)")
 
@@ -188,6 +202,7 @@ if __name__ == "__main__":
     print(f"\nAPI Status:")
     print(f"  Gemini AI: {'Enabled' if GEMINI_API_KEY else 'Disabled'}")
     print(f"  Finnhub: {'Enabled' if ENABLE_FINNHUB else 'Disabled'}")
+    print(f"  Grok/X: {'Enabled' if ENABLE_GROK else 'Disabled'}")
     print(f"  Vision OCR: {'Enabled' if ENABLE_VISION_OCR else 'Disabled'}")
     print(f"  Search Grounding: {'Enabled' if ENABLE_GOOGLE_SEARCH_GROUNDING else 'Disabled'}")
     print(f"\nNew Features:")

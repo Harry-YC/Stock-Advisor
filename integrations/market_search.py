@@ -414,6 +414,40 @@ def search_why_moved(symbol: str, direction: str = "moved") -> MarketSearchResul
     return client.search_why_stock_moved(symbol, direction)
 
 
+def search_general_query(query: str) -> MarketSearchResult:
+    """
+    Search for general stock/market questions using Google Search grounding.
+
+    Handles questions like:
+    - "When does SpaceX go public?"
+    - "What is the best AI stock to buy?"
+    - "How do interest rates affect stocks?"
+
+    Args:
+        query: User's general stock/market question
+
+    Returns:
+        MarketSearchResult with answer and sources
+    """
+    client = MarketSearchClient()
+    if not client.is_available():
+        return MarketSearchResult(content="API not configured", sources=[])
+
+    system_context = (
+        "You are a knowledgeable financial analyst and market researcher. "
+        "Answer the user's question about stocks, markets, investing, or finance. "
+        "Search for the most current and accurate information.\n\n"
+        "Guidelines:\n"
+        "- Provide factual, well-researched answers\n"
+        "- Include specific dates, numbers, and sources when available\n"
+        "- For IPO/public offering questions, note the current status and any announced timelines\n"
+        "- For investment questions, present balanced perspectives\n"
+        "- Always note that this is for informational purposes, not financial advice\n"
+    )
+
+    return client._search_with_grounding(query, system_context)
+
+
 def get_market_context(symbol: str) -> str:
     """Get formatted market context for expert prompts."""
     client = MarketSearchClient()

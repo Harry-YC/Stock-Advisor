@@ -1390,3 +1390,175 @@ def get_bilingual_expert_name(expert_name: str, lang: str = 'en') -> str:
         return f"{icon} {zh_name} ({expert_name})"
     else:
         return f"{icon} {expert_name}"
+
+
+# =============================================================================
+# RESEARCH PROMPT TEMPLATES
+# 10 detailed prompts for comprehensive stock research (inspired by Gemini best practices)
+# =============================================================================
+
+RESEARCH_PROMPTS = {
+    "business_understanding": {
+        "name": "Business Understanding",
+        "prompt": """Explain this company's business in simple terms:
+1. What problem does it solve?
+2. Who pays for its products/services?
+3. Why do customers choose it over alternatives?
+4. What is its core business model?
+
+Avoid financial jargon. Focus on how the business actually works.""",
+        "icon": "🏢",
+    },
+
+    "revenue_breakdown": {
+        "name": "Revenue Breakdown",
+        "prompt": """Break down this company's revenue streams:
+1. What are the main revenue segments?
+2. Which segments are growing and which are slowing?
+3. How dependent is the company on its top products/customers?
+4. What is the revenue mix (recurring vs one-time)?
+5. Geographic breakdown if relevant.""",
+        "icon": "💰",
+    },
+
+    "industry_context": {
+        "name": "Industry Context",
+        "prompt": """Explain the industry this company operates in:
+1. Is the market growing, stable, or shrinking?
+2. What long-term trends help or hurt this business?
+3. What are the key industry drivers?
+4. Where is this company positioned in the industry?
+5. What external factors (regulation, technology, macro) affect the industry?""",
+        "icon": "🌐",
+    },
+
+    "competitive_landscape": {
+        "name": "Competitive Landscape",
+        "prompt": """List the main competitors and compare them:
+1. Who are the direct competitors?
+2. Compare on: pricing power, product strength, scale, and moat
+3. Where does this company clearly win?
+4. Where does it clearly lose?
+5. What is the competitive intensity (high/medium/low)?""",
+        "icon": "⚔️",
+    },
+
+    "financial_quality": {
+        "name": "Financial Quality",
+        "prompt": """Analyze financial quality over recent years:
+1. Revenue growth consistency
+2. Profit margins and margin trends
+3. Debt levels and interest coverage
+4. Cash flow strength (operating vs free cash flow)
+5. Capital allocation (dividends, buybacks, M&A, R&D)
+6. Any accounting concerns or one-time items to adjust for?""",
+        "icon": "📊",
+    },
+
+    "risk_downside": {
+        "name": "Risk & Downside",
+        "prompt": """Identify the biggest risks to this company:
+1. Business model risks (disruption, obsolescence)
+2. Financial risks (debt, liquidity, covenant)
+3. Regulatory threats
+4. Management/execution risks
+5. What could permanently damage or destroy this business?
+6. What is the worst-case scenario?""",
+        "icon": "⚠️",
+    },
+
+    "management_execution": {
+        "name": "Management & Execution",
+        "prompt": """Evaluate the management team's track record:
+1. Have they executed well historically?
+2. Capital allocation decisions (good or poor?)
+3. How do their decisions impact long-term shareholders?
+4. Insider ownership and alignment
+5. Management tenure and turnover
+6. Any red flags (governance, compensation, related-party)?""",
+        "icon": "👔",
+    },
+
+    "bull_bear_scenario": {
+        "name": "Bull vs Bear Scenario",
+        "prompt": """Lay out realistic bull and bear cases for this stock over 3-5 years:
+
+BULL CASE:
+1. What needs to go right?
+2. What would revenue/earnings look like?
+3. What multiple is reasonable in the bull case?
+4. Probability assessment
+
+BEAR CASE:
+1. What could go wrong?
+2. What would revenue/earnings look like?
+3. What multiple is reasonable in the bear case?
+4. Probability assessment
+
+Focus on fundamentals, not price predictions.""",
+        "icon": "⚖️",
+    },
+
+    "valuation_thinking": {
+        "name": "Valuation Thinking",
+        "prompt": """Explain how investors might think about valuing this company:
+1. What valuation methods are most appropriate? (P/E, EV/EBITDA, DCF, etc.)
+2. What assumptions matter most in a valuation?
+3. Current valuation vs historical range
+4. Current valuation vs peers
+5. What would justify a higher valuation?
+6. What would justify a lower valuation?""",
+        "icon": "🧮",
+    },
+
+    "long_term_thesis": {
+        "name": "Long-Term Investment Thesis",
+        "prompt": """Help form a long-term investment thesis:
+1. Why could this be a good long-term investment?
+2. What must go right for the thesis to work?
+3. What are the key milestones to monitor?
+4. What signs would tell you the thesis is wrong?
+5. What is the expected holding period?
+6. Summary: Why own this stock for 3-5+ years?""",
+        "icon": "📜",
+    },
+}
+
+
+def get_research_prompt(prompt_key: str, ticker: str) -> str:
+    """
+    Get a research prompt formatted for a specific ticker.
+
+    Args:
+        prompt_key: Key from RESEARCH_PROMPTS
+        ticker: Stock ticker symbol
+
+    Returns:
+        Formatted prompt string
+    """
+    if prompt_key not in RESEARCH_PROMPTS:
+        return f"Unknown research prompt: {prompt_key}"
+
+    template = RESEARCH_PROMPTS[prompt_key]
+    return f"Company: ${ticker}\n\n{template['prompt']}"
+
+
+def get_all_research_prompts(ticker: str) -> List[Dict[str, str]]:
+    """
+    Get all research prompts for a ticker.
+
+    Args:
+        ticker: Stock ticker symbol
+
+    Returns:
+        List of dicts with 'name', 'icon', and 'prompt'
+    """
+    results = []
+    for key, template in RESEARCH_PROMPTS.items():
+        results.append({
+            "key": key,
+            "name": template["name"],
+            "icon": template["icon"],
+            "prompt": get_research_prompt(key, ticker),
+        })
+    return results

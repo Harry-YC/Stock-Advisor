@@ -38,6 +38,7 @@ from services.stock_data_service import (
     analyze_kol_screenshot,
     search_why_stock_moved,
 )
+from integrations.market_search import search_general_query
 from services.kol_analyzer import KOLAnalyzer, analyze_kol_text
 
 logger = logging.getLogger(__name__)
@@ -1248,21 +1249,16 @@ async def on_message(message: cl.Message):
                 await cl.Message(content=f"**Error:** Analysis failed - {e}").send()
 
     else:
-        # General question without specific tickers
-        from services.llm_router import get_llm_router
-        router = get_llm_router()
+        # General question without specific tickers - use web search for real-time info
+        async with cl.Step(name="Searching", type="tool") as step:
+            step.output = "Searching for information..."
+            search_result = await asyncio.to_thread(search_general_query, user_input)
+            step.output = f"Found {len(search_result.sources)} sources"
 
-        response_content = ""
-        async with cl.Step(name="Answering", type="run") as step:
-            for chunk in router.call_expert_stream(
-                prompt=user_input,
-                system="You are a knowledgeable stock market analyst. Answer questions about stocks, "
-                       "markets, and investing. Be factual and balanced. Always note that this is not "
-                       "financial advice."
-            ):
-                if chunk.get("type") == "chunk":
-                    response_content += chunk.get("content", "")
-            step.output = "Done"
+        # Format response with sources
+        response_content = search_result.content
+        if search_result.sources:
+            response_content += search_result.format_sources(max_sources=5)
 
         await cl.Message(content=response_content).send()
 
