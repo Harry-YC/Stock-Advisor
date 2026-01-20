@@ -411,7 +411,7 @@ class GrokService:
         api_key: Optional[str] = None,
         model: str = "default",
         max_retries: int = 7,
-        timeout: int = 150,
+        timeout: int = 180,
         mock_mode: bool = False
     ):
         self.api_key = api_key or os.getenv("XAI_API_KEY")
