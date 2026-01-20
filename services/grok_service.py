@@ -1097,8 +1097,8 @@ Focus on the last 7 days when possible."""
                 {"role": "user", "content": prompt}
             ],
             "model": self.model,
-            "temperature": 0.3,
-            "max_tokens": 2000
+            "temperature": 0.25,
+            "max_tokens": 2200
         }
 
         try:
