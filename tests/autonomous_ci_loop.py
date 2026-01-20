@@ -429,31 +429,9 @@ def get_code_context() -> str:
 ITERATION_LEARNINGS = []
 
 # Predefined improvements to apply when Gemini doesn't suggest any
+# NOTE: Already applied in previous runs: timeout (60→90), GROK_CACHE_TTL (3600→7200),
+#       QUOTE_CACHE_TTL (300→600), FINANCIALS_CACHE_TTL (3600→7200)
 FALLBACK_IMPROVEMENTS = [
-    {
-        "file": "services/grok_service.py",
-        "description": "Increase Grok API timeout for reliability",
-        "old_code": "timeout: int = 60,",
-        "new_code": "timeout: int = 90,",
-    },
-    {
-        "file": "services/grok_service.py",
-        "description": "Increase Grok cache TTL for better performance",
-        "old_code": 'GROK_CACHE_TTL", "3600"',
-        "new_code": 'GROK_CACHE_TTL", "7200"',
-    },
-    {
-        "file": "integrations/finnhub.py",
-        "description": "Increase Finnhub quote cache duration",
-        "old_code": "QUOTE_CACHE_TTL = 300",
-        "new_code": "QUOTE_CACHE_TTL = 600",
-    },
-    {
-        "file": "integrations/finnhub.py",
-        "description": "Increase Finnhub financials cache duration",
-        "old_code": "FINANCIALS_CACHE_TTL = 3600",
-        "new_code": "FINANCIALS_CACHE_TTL = 7200",
-    },
     {
         "file": "services/grok_service.py",
         "description": "Increase max retries for API reliability",
@@ -477,6 +455,18 @@ FALLBACK_IMPROVEMENTS = [
         "description": "Increase max tokens for better responses",
         "old_code": '"max_tokens": 2000',
         "new_code": '"max_tokens": 2500',
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase candle cache duration for daily charts",
+        "old_code": "CANDLE_CACHE_TTL = 3600",
+        "new_code": "CANDLE_CACHE_TTL = 7200",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase timeout further for slow networks",
+        "old_code": "timeout: int = 90,",
+        "new_code": "timeout: int = 120,",
     },
 ]
 
