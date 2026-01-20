@@ -420,7 +420,7 @@ class GrokService:
         self.max_retries = max_retries
         self.timeout = timeout
         self._cache: Dict[str, Dict[str, Any]] = {}
-        self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "10800"))  # 1 hour cache
+        self._cache_ttl = int(os.getenv("GROK_CACHE_TTL", "14400"))  # 1 hour cache
         self._cache_file = os.path.join(os.getcwd(), ".grok_cache_stock.json")
 
         # Mock mode for testing without API
