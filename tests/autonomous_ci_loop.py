@@ -454,6 +454,30 @@ FALLBACK_IMPROVEMENTS = [
         "old_code": "FINANCIALS_CACHE_TTL = 3600",
         "new_code": "FINANCIALS_CACHE_TTL = 7200",
     },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase max retries for API reliability",
+        "old_code": "max_retries: int = 3,",
+        "new_code": "max_retries: int = 4,",
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase news cache duration",
+        "old_code": "NEWS_CACHE_TTL = 900",
+        "new_code": "NEWS_CACHE_TTL = 1200",
+    },
+    {
+        "file": "integrations/finnhub.py",
+        "description": "Increase profile cache duration",
+        "old_code": "PROFILE_CACHE_TTL = 3600",
+        "new_code": "PROFILE_CACHE_TTL = 7200",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase max tokens for better responses",
+        "old_code": '"max_tokens": 2000',
+        "new_code": '"max_tokens": 2500',
+    },
 ]
 
 # Track which fallback improvements have been applied
