@@ -180,6 +180,9 @@ def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> d
     import re
     text = ""
 
+    # Get learnings from previous iterations
+    learnings = get_learnings_summary()
+
     try:
         from google import genai
         from google.genai import types
@@ -187,25 +190,38 @@ def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> d
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         client = genai.Client(api_key=api_key)
 
-        # Simplified prompt for reliable JSON
-        prompt = f"""Evaluate this Stock Advisor output and suggest improvements.
+        # Enhanced prompt with learnings
+        prompt = f"""You are improving a Stock Advisor app. Evaluate the output and suggest ONE concrete code improvement.
 
-SYNTHESIS:
-{synthesis[:3000]}
+ITERATION: {iteration}
 
-CODE SNIPPETS:
-{code_context[:4000]}
+PREVIOUS LEARNINGS:
+{learnings}
 
-Return ONLY this JSON structure (no markdown, no explanation):
-{{"score": 7, "kol_quality": 7, "market_quality": 7, "issues": ["issue1"], "improvements": [{{"file": "services/grok_service.py", "desc": "description", "old": "exact old code", "new": "new code"}}], "summary": "brief summary"}}
+CURRENT OUTPUT QUALITY:
+{synthesis[:2500]}
 
-RULES:
-1. score: 1-10 based on data quality
-2. improvements: max 2, with EXACT code snippets from the context above
-3. old must match exactly what's in the code
-4. Keep changes small (1-3 lines)
+CODE TO IMPROVE (find exact strings to replace):
+{code_context[:5000]}
 
-JSON only:"""
+IMPORTANT: You MUST suggest at least ONE improvement. Look for:
+- Error handling that could be added
+- Timeout values that could be adjusted
+- Cache TTLs that could be optimized
+- Logging that could be added
+- Default values that could be improved
+
+Return ONLY valid JSON (no markdown, no ```):
+{{"score": 7, "issues": ["issue description"], "improvements": [{{"file": "services/grok_service.py", "desc": "Add timeout handling", "old": "EXACT code from above", "new": "improved code"}}], "summary": "what was improved"}}
+
+CRITICAL RULES:
+1. "old" MUST be an EXACT substring from the CODE section above (copy-paste it)
+2. "new" must be valid Python that replaces "old"
+3. Keep changes to 1-3 lines
+4. Score 1-10 based on output quality
+5. ALWAYS include at least one improvement suggestion
+
+JSON:"""
 
         response = client.models.generate_content(
             model="gemini-3-pro-preview",
@@ -409,8 +425,66 @@ def get_code_context() -> str:
     return context[:8000]  # Limit context size
 
 
-def run_iteration(iteration: int, total_iterations: int = 0) -> dict:
-    """Run a single iteration of the CI loop."""
+# Global learnings tracker
+ITERATION_LEARNINGS = []
+
+# Predefined improvements to apply when Gemini doesn't suggest any
+FALLBACK_IMPROVEMENTS = [
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase Grok API timeout for reliability",
+        "old_code": "timeout=60",
+        "new_code": "timeout=90",
+    },
+    {
+        "file": "services/grok_service.py",
+        "description": "Increase cache TTL for better performance",
+        "old_code": "CACHE_TTL = 3600",
+        "new_code": "CACHE_TTL = 7200",
+    },
+    {
+        "file": "integrations/market_search.py",
+        "description": "Increase market search timeout",
+        "old_code": "timeout=30",
+        "new_code": "timeout=45",
+    },
+    {
+        "file": "services/stock_data_service.py",
+        "description": "Increase quote cache duration",
+        "old_code": "QUOTE_CACHE_TTL = 300",
+        "new_code": "QUOTE_CACHE_TTL = 600",
+    },
+]
+
+# Track which fallback improvements have been applied
+APPLIED_FALLBACKS = set()
+
+
+def get_fallback_improvements(iteration: int, score: int) -> list:
+    """Get fallback improvements when Gemini doesn't suggest any."""
+    available = []
+    for i, imp in enumerate(FALLBACK_IMPROVEMENTS):
+        if i not in APPLIED_FALLBACKS:
+            available.append(imp)
+            APPLIED_FALLBACKS.add(i)
+            break  # Only return one at a time
+    return available
+
+
+def get_learnings_summary() -> str:
+    """Get a summary of learnings from previous iterations."""
+    if not ITERATION_LEARNINGS:
+        return "No previous iterations yet."
+
+    summary = f"Previous {len(ITERATION_LEARNINGS)} iterations:\n"
+    for learning in ITERATION_LEARNINGS[-5:]:  # Last 5 iterations
+        summary += f"- Iter {learning['iteration']}: Score {learning['score']}/10, "
+        summary += f"Issues: {learning.get('issues', 'none')}\n"
+    return summary
+
+
+def run_iteration(iteration: int, total_iterations: int = 0, previous_results: list = None) -> dict:
+    """Run a single iteration of the improvement loop."""
     log(f"\n{'='*60}")
     if total_iterations > 0:
         log(f"ITERATION {iteration}/{total_iterations}")
@@ -422,6 +496,11 @@ def run_iteration(iteration: int, total_iterations: int = 0) -> dict:
     question_idx = (iteration - 1) % NUM_QUESTION_SETS
     questions = ITERATION_QUESTIONS[question_idx]
     log(f"Using question set {question_idx + 1}/{NUM_QUESTION_SETS}")
+
+    # Show learnings from previous iterations
+    if ITERATION_LEARNINGS:
+        log(f"  Learning from {len(ITERATION_LEARNINGS)} previous iterations")
+
     results = {
         "iteration": iteration,
         "started": datetime.now().isoformat(),
@@ -480,14 +559,29 @@ def run_iteration(iteration: int, total_iterations: int = 0) -> dict:
     # Step 5: Apply improvements
     log("\n--- Step 5: Applying Improvements ---")
     improvements = evaluation.get("improvements", [])
+
+    # If no improvements from Gemini, use fallback improvements based on score
+    if not improvements and score < 8:
+        log("  No Gemini improvements, using fallback strategy")
+        improvements = get_fallback_improvements(iteration, score)
+
     if improvements:
-        log(f"  {len(improvements)} improvements suggested")
-        for imp in improvements[:5]:  # Limit to 5 improvements per iteration
+        log(f"  {len(improvements)} improvements to apply")
+        for imp in improvements[:3]:  # Limit to 3 improvements per iteration
             success = apply_improvement(imp)
             if success:
                 results["improvements_applied"] += 1
+                log(f"    ✓ Applied: {imp.get('description', imp.get('desc', 'improvement'))[:50]}")
     else:
-        log("  No improvements suggested")
+        log("  No improvements to apply")
+
+    # Save learnings for next iteration
+    ITERATION_LEARNINGS.append({
+        "iteration": iteration,
+        "score": score,
+        "issues": evaluation.get("issues", [])[:3],
+        "applied": results["improvements_applied"],
+    })
 
     # Step 6: Commit and push
     log("\n--- Step 6: Git Commit & Push ---")
