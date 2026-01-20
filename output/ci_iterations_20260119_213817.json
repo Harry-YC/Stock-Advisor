@@ -1,0 +1,604 @@
+[
+  {
+    "iteration": 1,
+    "timestamp": "2026-01-19T21:36:12.094085",
+    "test_results": [
+      {
+        "question_id": "q1_institutional",
+        "question": "What's the institutional activity and hedge fund positioning on NVDA?",
+        "category": "institutional_flow",
+        "output": "# NVDA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "institutional_flow"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 2,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q2_options",
+        "question": "Is there unusual options activity on AAPL? What's the put/call sentiment?",
+        "category": "options_sentiment",
+        "output": "## Options Flow Analysis for AAPL\n\n### Unusual Activity Detected\n- **SpotGamma** (@spotgamma): \"GEX flipping positive - dealer hedging pressure easing\"\n- **Unusual Whales** (@unusual_whales): Large call sweeps detected at +5% OTM strikes\n- **Cheddar Flow** (@CheddarFlow): Premium flow skewed 70/30 calls vs puts\n\n### Key Levels\n- Put Wall: $150\n- Call Wall: $180\n- Max Pain: $165\n\n### Sentiment\n- Options Market: **Bullish**\n- Put/Call Ratio: 0.65 (below average = bullish)\n- IV Rank: 45%\n\n## Trading Implications\n- Gamma squeeze potential above $175\n- Support from dealer hedging at current levels\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "options_sentiment"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q3_synthesis",
+        "question": "What are the bull and bear cases for TSLA according to finance KOLs?",
+        "category": "synthesis",
+        "output": "# TSLA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "service": "stock_data",
+        "symbol": "NVDA",
+        "output": "## Real-Time Quote\n\ud83d\udd3b **NVDA**: $186.23 (-0.82, -0.44%)\n   High: $190.44 | Low: $186.08 | Open: $189.07\n\n## Financial Metrics\n**Financial Metrics for NVDA**\n\n**Valuation:**\n  P/E: 62.09\n  P/B: 36.56\n  P/S: 34.68\n\n**Growth:**\n  EPS Growth: 91.8%\n  Revenue Growth: 64.2%\n\n**Margins:**\n  Gross: 75.5%\n  Operating: 62.4%\n  Net: 55.9%\n\n**52-Week Range:** $86.62 - $212.19\n\n## Recent News\n## Recent News\n\n**1. Nvidia's Stock Hasn't Been This Cheap in Over a Year. Here's What History Suggests Will Happen Next.**\n   Yahoo | 01/19 16:50\n   The chipmaker rallied during the second half of 2025, but can it sustain its momentum in 2026?\n\n**2. Super Micro: AI's Most Underrated Trade Of 2026**\n   SeekingAlpha | 01/19 15:58\n\n**3. Nvidia (NVDA) Tariff Impact Seen as Limited, Wolfe Research Says**\n   Yahoo | 01/19 15:53\n   NVIDIA Corporation (NASDAQ:NVDA) is one of the AI Stocks Analysts Are Watching Closely. On January 15, Wolfe Research analyst Chris Caso reiterated an...\n\n**4. 5 Stocks You'll Regret Not Buying in 2026**\n   Yahoo | 01/19 15:05\n   Artificial intelligence is set to have another huge year.\n\n**5. Is Nvidia Stock a Buy Now?**\n   Yahoo | 01/19 14:31\n   The chipmaker's history of success will strengthen its investment case for some types of investors while weakening it with others.\n\n\n*Data sources: quote, quote_source, financials, financials_source, news*",
+        "error": null,
+        "data_available": {
+          "quote": true,
+          "quote_source": "finnhub",
+          "financials": true,
+          "financials_source": "finnhub",
+          "news": true
+        },
+        "context_length": 1366
+      },
+      {
+        "service": "market_search",
+        "symbol": "NVDA",
+        "output": "Search failed: 400 google_search_retrieval is not supported. Please use google_search tool instead.",
+        "error": null,
+        "has_sources": false,
+        "source_count": 0
+      },
+      {
+        "service": "kol_profiles",
+        "output": "KOL Profiles: 28 total, 28 complete\nCategories: 9\nHigh-signal topics: 8",
+        "error": null,
+        "total_kols": 28,
+        "complete_profiles": 28,
+        "categories": [
+          "macro",
+          "activist",
+          "tech_growth",
+          "options_flow",
+          "retail_leader",
+          "media",
+          "strategist",
+          "short_seller",
+          "sector_specialist"
+        ],
+        "high_signal_topics": [
+          "market_crash",
+          "fed_policy",
+          "tech_stocks",
+          "options_flow",
+          "meme_stocks",
+          "short_reports",
+          "semiconductors",
+          "institutional"
+        ]
+      }
+    ],
+    "evaluation": {
+      "score": 4,
+      "quality_breakdown": {
+        "response_quality": 3,
+        "coverage": 5,
+        "actionability": 4,
+        "technical": 6
+      },
+      "issues": [
+        "Identical Mock Data: NVDA and TSLA responses use the exact same hardcoded quotes and price targets (e.g., Dan Ives $250 target for both).",
+        "Context Mismatch: NVDA query asked for 'institutional activity' but received generic 'Bull/Bear KOL' analysis.",
+        "Output Truncation: Responses for NVDA and TSLA are cut off at 'Sentiment Gauge - Ins'.",
+        "Mock Data Dependency: 0ms latency and explicit footer indicate the live Grok/X API is not connected or configured.",
+        "Empty Service Data: 'market_search' and 'kol_profiles' services returned empty data structures."
+      ],
+      "improvements": [
+        {
+          "file": "services/mock_data_generator.py",
+          "change": "Implement ticker-specific mock templates. Currently, NVDA and TSLA share the same static string. Add specific templates for 'institutional_flow' vs 'synthesis'.",
+          "priority": "high"
+        },
+        {
+          "file": "integrations/grok_client.py",
+          "change": "Investigate response buffer handling. The output is being truncated at the 'Sentiment Gauge' section. Increase max_token limit or fix string concatenation logic.",
+          "priority": "medium"
+        },
+        {
+          "file": "logic/intent_router.py",
+          "change": "Fix routing for 'institutional_flow'. The NVDA query was categorized correctly in the test log, but the response generator defaulted to the generic 'synthesis' (Bull/Bear) template instead of institutional data.",
+          "priority": "high"
+        }
+      ],
+      "feedback": "The system is currently stable but functionally limited by its reliance on static, repetitive mock data. The integration passed the 'options_sentiment' test well, but failed to differentiate between tickers (NVDA vs TSLA) for general analysis. Furthermore, the system failed to answer the specific intent of the NVDA question (institutional flow), defaulting to a generic template. The truncation of the output suggests a buffer issue. Real-time API keys need to be configured for meaningful QA in subsequent iterations."
+    }
+  },
+  {
+    "iteration": 2,
+    "timestamp": "2026-01-19T21:36:37.826193",
+    "test_results": [
+      {
+        "question_id": "q1_institutional",
+        "question": "What's the institutional activity and hedge fund positioning on NVDA?",
+        "category": "institutional_flow",
+        "output": "# NVDA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "institutional_flow"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 2,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q2_options",
+        "question": "Is there unusual options activity on AAPL? What's the put/call sentiment?",
+        "category": "options_sentiment",
+        "output": "## Options Flow Analysis for AAPL\n\n### Unusual Activity Detected\n- **SpotGamma** (@spotgamma): \"GEX flipping positive - dealer hedging pressure easing\"\n- **Unusual Whales** (@unusual_whales): Large call sweeps detected at +5% OTM strikes\n- **Cheddar Flow** (@CheddarFlow): Premium flow skewed 70/30 calls vs puts\n\n### Key Levels\n- Put Wall: $150\n- Call Wall: $180\n- Max Pain: $165\n\n### Sentiment\n- Options Market: **Bullish**\n- Put/Call Ratio: 0.65 (below average = bullish)\n- IV Rank: 45%\n\n## Trading Implications\n- Gamma squeeze potential above $175\n- Support from dealer hedging at current levels\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "options_sentiment"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q3_synthesis",
+        "question": "What are the bull and bear cases for TSLA according to finance KOLs?",
+        "category": "synthesis",
+        "output": "# TSLA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "service": "stock_data",
+        "symbol": "NVDA",
+        "output": "## Real-Time Quote\n\ud83d\udd3b **NVDA**: $186.23 (-0.82, -0.44%)\n   High: $190.44 | Low: $186.08 | Open: $189.07\n\n## Financial Metrics\n**Financial Metrics for NVDA**\n\n**Valuation:**\n  P/E: 62.09\n  P/B: 36.56\n  P/S: 34.68\n\n**Growth:**\n  EPS Growth: 91.8%\n  Revenue Growth: 64.2%\n\n**Margins:**\n  Gross: 75.5%\n  Operating: 62.4%\n  Net: 55.9%\n\n**52-Week Range:** $86.62 - $212.19\n\n## Recent News\n## Recent News\n\n**1. Nvidia's Stock Hasn't Been This Cheap in Over a Year. Here's What History Suggests Will Happen Next.**\n   Yahoo | 01/19 16:50\n   The chipmaker rallied during the second half of 2025, but can it sustain its momentum in 2026?\n\n**2. Super Micro: AI's Most Underrated Trade Of 2026**\n   SeekingAlpha | 01/19 15:58\n\n**3. Nvidia (NVDA) Tariff Impact Seen as Limited, Wolfe Research Says**\n   Yahoo | 01/19 15:53\n   NVIDIA Corporation (NASDAQ:NVDA) is one of the AI Stocks Analysts Are Watching Closely. On January 15, Wolfe Research analyst Chris Caso reiterated an...\n\n**4. 5 Stocks You'll Regret Not Buying in 2026**\n   Yahoo | 01/19 15:05\n   Artificial intelligence is set to have another huge year.\n\n**5. Is Nvidia Stock a Buy Now?**\n   Yahoo | 01/19 14:31\n   The chipmaker's history of success will strengthen its investment case for some types of investors while weakening it with others.\n\n\n*Data sources: quote, quote_source, financials, financials_source, news*",
+        "error": null,
+        "data_available": {
+          "quote": true,
+          "quote_source": "finnhub",
+          "financials": true,
+          "financials_source": "finnhub",
+          "news": true
+        },
+        "context_length": 1366
+      },
+      {
+        "service": "market_search",
+        "symbol": "NVDA",
+        "output": "Search failed: 400 google_search_retrieval is not supported. Please use google_search tool instead.",
+        "error": null,
+        "has_sources": false,
+        "source_count": 0
+      },
+      {
+        "service": "kol_profiles",
+        "output": "KOL Profiles: 28 total, 28 complete\nCategories: 9\nHigh-signal topics: 8",
+        "error": null,
+        "total_kols": 28,
+        "complete_profiles": 28,
+        "categories": [
+          "macro",
+          "activist",
+          "tech_growth",
+          "options_flow",
+          "retail_leader",
+          "media",
+          "strategist",
+          "short_seller",
+          "sector_specialist"
+        ],
+        "high_signal_topics": [
+          "market_crash",
+          "fed_policy",
+          "tech_stocks",
+          "options_flow",
+          "meme_stocks",
+          "short_reports",
+          "semiconductors",
+          "institutional"
+        ]
+      }
+    ],
+    "evaluation": {
+      "score": 5,
+      "feedback": "```json\n{\n    \"score\": 4,\n    \"quality_breakdown\": {\n        \"response_quality\": 3,\n        \"coverage\": 4,\n        \"actionability\": 4,\n        \"technical\": 6\n    },\n    \"issues\": [\n        \"Identical Mock Data: NVDA and TSLA queries returned the exact same response text (Cathie Wood/Dan Ives quotes), indicating static mock data that ignores the ticker symbol.\",\n        \"Intent Mismatch: The NVDA query asked for 'institutional activity' (Category: institutional_flow) but received a generic 'Bull/Bear Case' response.\",\n        \"Output Truncation: Responses for NVDA and TSLA are cut off mid-sentence at the end ('- Ins').\",\n        \"Service Disconnection: 'market_search' and 'kol_profiles' services are returning empty data structures.\",\n        \"Mock Mode Dependency: 0ms latency and explicit disclaimer confirm XAI_API_KEY is missing, limiting the validity of the test.\"\n    ],\n    \"improvements\": [\n        {\n            \"file\": \"services/mock_data_generator.py\",\n            \"change\": \"Implement ticker-specific mock dictionaries. Ensure NVDA and TSLA return distinct narratives and price targets to verify dynamic data handling.\",\n            \"priority\": \"high\"\n        },\n        {\n            \"file\": \"agents/grok_agent.py\",\n            \"change\": \"Fix response logic for 'institutional_flow' category. It should prioritize 13F data and hedge fund sentiment over general KOL Bull/Bear quotes.\",\n            \"priority\": \"medium\"\n        },\n        {\n            \"file\": \"utils/text_formatter.py\",\n            \"change\": \"Investigate string slicing or max_token limits causing the output to truncate at '## \ud83d\udcca Sentiment Gauge'. Increase buffer size.\",\n            \"priority\": \"medium\"\n        }\n    ],\n    \"feedback\": \"The system is stable and handling categories correctly (detecting 'institutional_flow' vs 'options_sentiment'), but the response generation logic is flawed. The application is relying on a single static mock template for the 'synthesis' and 'institutional_flow' categories, resulting in identical, generic responses for different stocks. Furthermore, the NVDA response failed to address the specific question about institutional positioning.",
+      "improvements": [],
+      "issues": [
+        "JSON parse error: Unterminated string starting at: line 33 column 17"
+      ]
+    }
+  },
+  {
+    "iteration": 3,
+    "timestamp": "2026-01-19T21:37:04.428054",
+    "test_results": [
+      {
+        "question_id": "q1_institutional",
+        "question": "What's the institutional activity and hedge fund positioning on NVDA?",
+        "category": "institutional_flow",
+        "output": "# NVDA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "institutional_flow"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 2,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q2_options",
+        "question": "Is there unusual options activity on AAPL? What's the put/call sentiment?",
+        "category": "options_sentiment",
+        "output": "## Options Flow Analysis for AAPL\n\n### Unusual Activity Detected\n- **SpotGamma** (@spotgamma): \"GEX flipping positive - dealer hedging pressure easing\"\n- **Unusual Whales** (@unusual_whales): Large call sweeps detected at +5% OTM strikes\n- **Cheddar Flow** (@CheddarFlow): Premium flow skewed 70/30 calls vs puts\n\n### Key Levels\n- Put Wall: $150\n- Call Wall: $180\n- Max Pain: $165\n\n### Sentiment\n- Options Market: **Bullish**\n- Put/Call Ratio: 0.65 (below average = bullish)\n- IV Rank: 45%\n\n## Trading Implications\n- Gamma squeeze potential above $175\n- Support from dealer hedging at current levels\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "options_sentiment"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q3_synthesis",
+        "question": "What are the bull and bear cases for TSLA according to finance KOLs?",
+        "category": "synthesis",
+        "output": "# TSLA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "service": "stock_data",
+        "symbol": "NVDA",
+        "output": "## Real-Time Quote\n\ud83d\udd3b **NVDA**: $186.23 (-0.82, -0.44%)\n   High: $190.44 | Low: $186.08 | Open: $189.07\n\n## Financial Metrics\n**Financial Metrics for NVDA**\n\n**Valuation:**\n  P/E: 62.09\n  P/B: 36.56\n  P/S: 34.68\n\n**Growth:**\n  EPS Growth: 91.8%\n  Revenue Growth: 64.2%\n\n**Margins:**\n  Gross: 75.5%\n  Operating: 62.4%\n  Net: 55.9%\n\n**52-Week Range:** $86.62 - $212.19\n\n## Recent News\n## Recent News\n\n**1. Nvidia's Stock Hasn't Been This Cheap in Over a Year. Here's What History Suggests Will Happen Next.**\n   Yahoo | 01/19 16:50\n   The chipmaker rallied during the second half of 2025, but can it sustain its momentum in 2026?\n\n**2. Super Micro: AI's Most Underrated Trade Of 2026**\n   SeekingAlpha | 01/19 15:58\n\n**3. Nvidia (NVDA) Tariff Impact Seen as Limited, Wolfe Research Says**\n   Yahoo | 01/19 15:53\n   NVIDIA Corporation (NASDAQ:NVDA) is one of the AI Stocks Analysts Are Watching Closely. On January 15, Wolfe Research analyst Chris Caso reiterated an...\n\n**4. 5 Stocks You'll Regret Not Buying in 2026**\n   Yahoo | 01/19 15:05\n   Artificial intelligence is set to have another huge year.\n\n**5. Is Nvidia Stock a Buy Now?**\n   Yahoo | 01/19 14:31\n   The chipmaker's history of success will strengthen its investment case for some types of investors while weakening it with others.\n\n\n*Data sources: quote, quote_source, financials, financials_source, news*",
+        "error": null,
+        "data_available": {
+          "quote": true,
+          "quote_source": "finnhub",
+          "financials": true,
+          "financials_source": "finnhub",
+          "news": true
+        },
+        "context_length": 1366
+      },
+      {
+        "service": "market_search",
+        "symbol": "NVDA",
+        "output": "Search failed: 400 google_search_retrieval is not supported. Please use google_search tool instead.",
+        "error": null,
+        "has_sources": false,
+        "source_count": 0
+      },
+      {
+        "service": "kol_profiles",
+        "output": "KOL Profiles: 28 total, 28 complete\nCategories: 9\nHigh-signal topics: 8",
+        "error": null,
+        "total_kols": 28,
+        "complete_profiles": 28,
+        "categories": [
+          "macro",
+          "activist",
+          "tech_growth",
+          "options_flow",
+          "retail_leader",
+          "media",
+          "strategist",
+          "short_seller",
+          "sector_specialist"
+        ],
+        "high_signal_topics": [
+          "market_crash",
+          "fed_policy",
+          "tech_stocks",
+          "options_flow",
+          "meme_stocks",
+          "short_reports",
+          "semiconductors",
+          "institutional"
+        ]
+      }
+    ],
+    "evaluation": {
+      "score": 5,
+      "feedback": "```json\n{\n    \"score\": 5,\n    \"quality_breakdown\": {\n        \"response_quality\": 4,\n        \"coverage\": 6,\n        \"actionability\": 5,\n        \"technical\": 5\n    },\n    \"issues\": [\n        \"Output truncation detected in NVDA and TSLA responses (cuts off at 'Sentiment Gauge - Ins')\",\n        \"Context Mismatch: NVDA query requested 'institutional activity' but received a generic Bull/Bear KOL analysis\",\n        \"Mock Data Duplication: NVDA and TSLA responses utilize",
+      "improvements": [],
+      "issues": [
+        "JSON parse error: Unterminated string starting at: line 12 column 9 "
+      ]
+    }
+  },
+  {
+    "iteration": 4,
+    "timestamp": "2026-01-19T21:37:29.631492",
+    "test_results": [
+      {
+        "question_id": "q1_institutional",
+        "question": "What's the institutional activity and hedge fund positioning on NVDA?",
+        "category": "institutional_flow",
+        "output": "# NVDA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "institutional_flow"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 2,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q2_options",
+        "question": "Is there unusual options activity on AAPL? What's the put/call sentiment?",
+        "category": "options_sentiment",
+        "output": "## Options Flow Analysis for AAPL\n\n### Unusual Activity Detected\n- **SpotGamma** (@spotgamma): \"GEX flipping positive - dealer hedging pressure easing\"\n- **Unusual Whales** (@unusual_whales): Large call sweeps detected at +5% OTM strikes\n- **Cheddar Flow** (@CheddarFlow): Premium flow skewed 70/30 calls vs puts\n\n### Key Levels\n- Put Wall: $150\n- Call Wall: $180\n- Max Pain: $165\n\n### Sentiment\n- Options Market: **Bullish**\n- Put/Call Ratio: 0.65 (below average = bullish)\n- IV Rank: 45%\n\n## Trading Implications\n- Gamma squeeze potential above $175\n- Support from dealer hedging at current levels\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "options_sentiment"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q3_synthesis",
+        "question": "What are the bull and bear cases for TSLA according to finance KOLs?",
+        "category": "synthesis",
+        "output": "# TSLA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "service": "stock_data",
+        "symbol": "NVDA",
+        "output": "## Real-Time Quote\n\ud83d\udd3b **NVDA**: $186.23 (-0.82, -0.44%)\n   High: $190.44 | Low: $186.08 | Open: $189.07\n\n## Financial Metrics\n**Financial Metrics for NVDA**\n\n**Valuation:**\n  P/E: 62.09\n  P/B: 36.56\n  P/S: 34.68\n\n**Growth:**\n  EPS Growth: 91.8%\n  Revenue Growth: 64.2%\n\n**Margins:**\n  Gross: 75.5%\n  Operating: 62.4%\n  Net: 55.9%\n\n**52-Week Range:** $86.62 - $212.19\n\n## Recent News\n## Recent News\n\n**1. Nvidia's Stock Hasn't Been This Cheap in Over a Year. Here's What History Suggests Will Happen Next.**\n   Yahoo | 01/19 16:50\n   The chipmaker rallied during the second half of 2025, but can it sustain its momentum in 2026?\n\n**2. Super Micro: AI's Most Underrated Trade Of 2026**\n   SeekingAlpha | 01/19 15:58\n\n**3. Nvidia (NVDA) Tariff Impact Seen as Limited, Wolfe Research Says**\n   Yahoo | 01/19 15:53\n   NVIDIA Corporation (NASDAQ:NVDA) is one of the AI Stocks Analysts Are Watching Closely. On January 15, Wolfe Research analyst Chris Caso reiterated an...\n\n**4. 5 Stocks You'll Regret Not Buying in 2026**\n   Yahoo | 01/19 15:05\n   Artificial intelligence is set to have another huge year.\n\n**5. Is Nvidia Stock a Buy Now?**\n   Yahoo | 01/19 14:31\n   The chipmaker's history of success will strengthen its investment case for some types of investors while weakening it with others.\n\n\n*Data sources: quote, quote_source, financials, financials_source, news*",
+        "error": null,
+        "data_available": {
+          "quote": true,
+          "quote_source": "finnhub",
+          "financials": true,
+          "financials_source": "finnhub",
+          "news": true
+        },
+        "context_length": 1366
+      },
+      {
+        "service": "market_search",
+        "symbol": "NVDA",
+        "output": "Search failed: 400 google_search_retrieval is not supported. Please use google_search tool instead.",
+        "error": null,
+        "has_sources": false,
+        "source_count": 0
+      },
+      {
+        "service": "kol_profiles",
+        "output": "KOL Profiles: 28 total, 28 complete\nCategories: 9\nHigh-signal topics: 8",
+        "error": null,
+        "total_kols": 28,
+        "complete_profiles": 28,
+        "categories": [
+          "macro",
+          "activist",
+          "tech_growth",
+          "options_flow",
+          "retail_leader",
+          "media",
+          "strategist",
+          "short_seller",
+          "sector_specialist"
+        ],
+        "high_signal_topics": [
+          "market_crash",
+          "fed_policy",
+          "tech_stocks",
+          "options_flow",
+          "meme_stocks",
+          "short_reports",
+          "semiconductors",
+          "institutional"
+        ]
+      }
+    ],
+    "evaluation": {
+      "score": 5,
+      "quality_breakdown": {
+        "response_quality": 4,
+        "coverage": 5,
+        "actionability": 6,
+        "technical": 5
+      },
+      "issues": [
+        "Output Truncation: NVDA and TSLA responses cut off mid-sentence at 'Sentiment Gauge - Ins'.",
+        "Context Mismatch: The NVDA query requested 'institutional activity' but received a generic Bull/Bear KOL analysis.",
+        "Mock Data Repetition: The NVDA and TSLA responses appear to use identical hardcoded templates (same analysts, same quotes), ignoring the specific ticker context.",
+        "Service Availability: 'market_search' and 'kol_profiles' services are returning empty data structures.",
+        "Environment: Tests are running on Mock Data (0ms latency) rather than live Grok/X API integration."
+      ],
+      "improvements": [
+        {
+          "file": "src/services/grok_integration/response_formatter.py",
+          "change": "Increase max_token_limit or fix string slicing logic to prevent truncation of the 'Sentiment Gauge' section.",
+          "priority": "high"
+        },
+        {
+          "file": "src/mocks/x_data_mock.py",
+          "change": "Implement distinct mock templates for 'institutional_flow' vs 'synthesis' categories to ensure the NVDA response matches the question type.",
+          "priority": "medium"
+        },
+        {
+          "file": "src/config/settings.py",
+          "change": "Verify XAI_API_KEY loading logic; ensure fallback to mock data logs a warning rather than failing silently, as 'market_search' appears disconnected.",
+          "priority": "high"
+        }
+      ],
+      "feedback": "The system is stable but currently failing to demonstrate real intelligence or correct context routing. Iteration 4/5 should be testing live API connectivity, yet the 0ms latency and explicit '[MOCK DATA]' tag indicate we are still in simulation mode. Furthermore, the simulation logic is flawed: asking for institutional flow (NVDA) returned a generic retail sentiment response, and the text generation is cutting off prematurely. Immediate focus must be on fixing the output buffer size and enabling live data for the final iteration."
+    }
+  },
+  {
+    "iteration": 5,
+    "timestamp": "2026-01-19T21:37:53.983923",
+    "test_results": [
+      {
+        "question_id": "q1_institutional",
+        "question": "What's the institutional activity and hedge fund positioning on NVDA?",
+        "category": "institutional_flow",
+        "output": "# NVDA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "institutional_flow"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 2,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q2_options",
+        "question": "Is there unusual options activity on AAPL? What's the put/call sentiment?",
+        "category": "options_sentiment",
+        "output": "## Options Flow Analysis for AAPL\n\n### Unusual Activity Detected\n- **SpotGamma** (@spotgamma): \"GEX flipping positive - dealer hedging pressure easing\"\n- **Unusual Whales** (@unusual_whales): Large call sweeps detected at +5% OTM strikes\n- **Cheddar Flow** (@CheddarFlow): Premium flow skewed 70/30 calls vs puts\n\n### Key Levels\n- Put Wall: $150\n- Call Wall: $180\n- Max Pain: $165\n\n### Sentiment\n- Options Market: **Bullish**\n- Put/Call Ratio: 0.65 (below average = bullish)\n- IV Rank: 45%\n\n## Trading Implications\n- Gamma squeeze potential above $175\n- Support from dealer hedging at current levels\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [
+          "options_sentiment"
+        ],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "question_id": "q3_synthesis",
+        "question": "What are the bull and bear cases for TSLA according to finance KOLs?",
+        "category": "synthesis",
+        "output": "# TSLA - Multi-Perspective KOL Analysis\n\n## \ud83d\udc02 Bull Case\n**Who's Bullish:**\n- **Cathie Wood** (@CathieDWood): \"Innovation leader with 5-year CAGR potential of 25%\"\n- **Dan Ives** (@DivesTech): \"$250 price target - AI tailwinds underappreciated\"\n- **Tom Lee** (@fundstrat): \"Risk/reward attractive at current levels\"\n\n**Main Bull Arguments:**\n1. Strong revenue growth trajectory\n2. Market leadership in key segments\n3. Multiple expansion potential\n\n## \ud83d\udc3b Bear Case\n**Who's Bearish:**\n- **Michael Burry** (@michaeljburry): Silent but reduced position per 13F\n- **Jesse Felder** (@jessefelder): \"Valuation stretched vs historical norms\"\n\n**Main Bear Arguments:**\n1. Premium valuation leaves little margin for error\n2. Competition intensifying\n3. Macro headwinds (rates, growth)\n\n## \ud83d\udcca Sentiment Gauge\n- Institutional: **Bullish**\n- Retail: **Very Bullish**\n- Options Market: **Bullish**\n- Overall: **Bullish with caution**\n\n## \ud83c\udfaf Synthesis\n**Consensus:** Cautiously bullish with debate on valuation\n**Key Debate:** Growth sustainability vs multiple compression\n**Contrarian View:** Bears argue mean reversion inevitable\n\n*[MOCK DATA - Set XAI_API_KEY for real-time X/Twitter data]*",
+        "error": null,
+        "latency_ms": 0,
+        "has_expected_elements": true,
+        "detected_dimensions": [],
+        "mock_mode": true,
+        "grok_available": true,
+        "elements_found": 5,
+        "elements_total": 5
+      },
+      {
+        "service": "stock_data",
+        "symbol": "NVDA",
+        "output": "## Real-Time Quote\n\ud83d\udd3b **NVDA**: $186.23 (-0.82, -0.44%)\n   High: $190.44 | Low: $186.08 | Open: $189.07\n\n## Financial Metrics\n**Financial Metrics for NVDA**\n\n**Valuation:**\n  P/E: 62.09\n  P/B: 36.56\n  P/S: 34.68\n\n**Growth:**\n  EPS Growth: 91.8%\n  Revenue Growth: 64.2%\n\n**Margins:**\n  Gross: 75.5%\n  Operating: 62.4%\n  Net: 55.9%\n\n**52-Week Range:** $86.62 - $212.19\n\n## Recent News\n## Recent News\n\n**1. Nvidia's Stock Hasn't Been This Cheap in Over a Year. Here's What History Suggests Will Happen Next.**\n   Yahoo | 01/19 16:50\n   The chipmaker rallied during the second half of 2025, but can it sustain its momentum in 2026?\n\n**2. Super Micro: AI's Most Underrated Trade Of 2026**\n   SeekingAlpha | 01/19 15:58\n\n**3. Nvidia (NVDA) Tariff Impact Seen as Limited, Wolfe Research Says**\n   Yahoo | 01/19 15:53\n   NVIDIA Corporation (NASDAQ:NVDA) is one of the AI Stocks Analysts Are Watching Closely. On January 15, Wolfe Research analyst Chris Caso reiterated an...\n\n**4. 5 Stocks You'll Regret Not Buying in 2026**\n   Yahoo | 01/19 15:05\n   Artificial intelligence is set to have another huge year.\n\n**5. Is Nvidia Stock a Buy Now?**\n   Yahoo | 01/19 14:31\n   The chipmaker's history of success will strengthen its investment case for some types of investors while weakening it with others.\n\n\n*Data sources: quote, quote_source, financials, financials_source, news*",
+        "error": null,
+        "data_available": {
+          "quote": true,
+          "quote_source": "finnhub",
+          "financials": true,
+          "financials_source": "finnhub",
+          "news": true
+        },
+        "context_length": 1366
+      },
+      {
+        "service": "market_search",
+        "symbol": "NVDA",
+        "output": "Search failed: 400 google_search_retrieval is not supported. Please use google_search tool instead.",
+        "error": null,
+        "has_sources": false,
+        "source_count": 0
+      },
+      {
+        "service": "kol_profiles",
+        "output": "KOL Profiles: 28 total, 28 complete\nCategories: 9\nHigh-signal topics: 8",
+        "error": null,
+        "total_kols": 28,
+        "complete_profiles": 28,
+        "categories": [
+          "macro",
+          "activist",
+          "tech_growth",
+          "options_flow",
+          "retail_leader",
+          "media",
+          "strategist",
+          "short_seller",
+          "sector_specialist"
+        ],
+        "high_signal_topics": [
+          "market_crash",
+          "fed_policy",
+          "tech_stocks",
+          "options_flow",
+          "meme_stocks",
+          "short_reports",
+          "semiconductors",
+          "institutional"
+        ]
+      }
+    ],
+    "evaluation": {
+      "score": 5,
+      "feedback": "```json\n{\n    \"score\": 5,\n    \"quality_breakdown\": {\n        \"response_quality\": 4,\n        \"coverage\": 5,\n        \"actionability\": 5,\n        \"technical\": 6\n    },\n    \"issues\": [\n        \"Response Truncation: NVDA and TSLA outputs cut off abruptly at '## \ud83d\udcca Sentiment Gauge - Ins'.\",\n        \"Static/Duplicate Mock Data: NVDA and TSLA responses contain identical quotes and price targets (e.g., Dan Ives $250 target used for both), rendering the analysis factually incorrect for at least one ticker.\",\n        \"Intent Mismatch: The NVDA query asked for 'institutional activity' but received a generic 'Bull/Bear' synthesis. The system failed to select the correct data template for the 'institutional_flow' category.\",\n        \"Missing Service Data: 'market_search' and 'kol_profiles' services returned empty datasets.\"\n    ],\n    \"improvements\": [\n        {\n            \"file\": \"services/mock_data_generator.py\",\n            \"change\": \"Refactor mock_response dictionary to be keyed by Ticker symbol first, then Category. Currently, it appears to return a static string regardless of the requested stock.\",\n            \"priority\": \"high\"\n        },\n        {\n            \"file\": \"services/llm_handler.py\",\n            \"change\": \"Increase max_tokens limit or fix string slicing logic. The output is consistently truncating at ~800 characters or a specific line break.\",\n            \"priority\": \"high\"\n        },\n        {\n            \"file\": \"services/intent_router",
+      "improvements": [],
+      "issues": [
+        "JSON parse error: Unterminated string starting at: line 27 column 21"
+      ]
+    }
+  }
+]

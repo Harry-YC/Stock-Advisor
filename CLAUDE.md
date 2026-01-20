@@ -349,4 +349,60 @@ See `PROMPT.md` for the 9-phase autonomous improvement workflow:
 9. **Commit & Report** - Git commit if score >= 8
 
 ---
-*Last updated: 2026-01-19*
+
+## Autonomous CI Loop (RECOMMENDED)
+
+The most efficient way to continuously improve the codebase:
+
+```bash
+# Run 10 iterations with git push after each improvement
+python3 -u tests/autonomous_ci_loop.py -n 10
+
+# Run continuously until score >= 8 for 3 consecutive iterations
+python3 -u tests/autonomous_ci_loop.py
+
+# Run with custom target score
+python3 -u tests/autonomous_ci_loop.py --target-score 9
+
+# Skip git push (local development)
+python3 -u tests/autonomous_ci_loop.py --no-push
+```
+
+### Each Iteration Does:
+
+1. **Grok KOL Insights** - Gets X/Twitter sentiment from 20+ finance KOLs
+2. **Market News** - Real-time news via Google Search Grounding
+3. **Synthesize** - Combines gathered intelligence
+4. **Gemini 3 Pro Evaluation** - Scores quality (1-10), suggests code improvements
+5. **Apply Improvements** - Auto-applies fixes with syntax validation
+6. **Git Commit & Push** - Commits after each successful improvement
+
+### 10 Stock Question Sets (cycles through):
+
+| Set | Theme | Example Tickers |
+|-----|-------|-----------------|
+| 1 | Mega-cap Tech | NVDA, AAPL, MSFT |
+| 2 | Semiconductors | TSM, AMD, AVGO |
+| 3 | EV & Energy | TSLA, RIVN, ENPH |
+| 4 | Finance | JPM, UNH, V |
+| 5 | Big Tech | GOOGL, AMZN, META |
+| 6 | Growth | PLTR, SNOW, CRWD |
+| 7 | Value | BRK.B, JNJ, PG |
+| 8 | China | BABA, PDD, NIO |
+| 9 | Retail | WMT, COST, TGT |
+| 10 | Biotech | LLY, MRNA, ABBV |
+
+### Stop Conditions:
+
+- Reached `-n` iteration limit
+- Score >= target for 3 consecutive iterations
+- Keyboard interrupt (Ctrl+C)
+
+### Output Files:
+
+Results saved to `output/`:
+- `autonomous_ci_YYYYMMDD_HHMMSS_final.json` - Complete run results
+- `autonomous_ci_YYYYMMDD_HHMMSS_checkpoint_iterN.json` - Checkpoints every 5 iterations
+
+---
+*Last updated: 2026-01-20*

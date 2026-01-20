@@ -24,39 +24,72 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-# Stock questions for each iteration - diverse topics
+# Stock questions for continuous iterations - cycles through these
 ITERATION_QUESTIONS = [
-    # Iteration 1: Tech stocks
+    # Set 1: Mega-cap Tech
     [
         {"symbol": "NVDA", "question": "What's the institutional sentiment on NVDA? Are hedge funds buying or selling?"},
-        {"symbol": "AAPL", "question": "What do finance KOLs think about Apple's AI strategy?"},
-        {"symbol": "MSFT", "question": "Is Microsoft overvalued at current levels?"},
+        {"symbol": "AAPL", "question": "What do finance KOLs think about Apple's AI strategy and iPhone sales?"},
+        {"symbol": "MSFT", "question": "Is Microsoft overvalued? What's the sentiment on Azure growth?"},
     ],
-    # Iteration 2: Semiconductor & AI
+    # Set 2: Semiconductor & AI
     [
         {"symbol": "TSM", "question": "What's the geopolitical risk for TSM and how are KOLs positioning?"},
-        {"symbol": "AMD", "question": "AMD vs NVDA - which do retail traders prefer on X?"},
-        {"symbol": "AVGO", "question": "What's the options flow sentiment on Broadcom?"},
+        {"symbol": "AMD", "question": "AMD vs NVDA - which do retail traders prefer? Options flow?"},
+        {"symbol": "AVGO", "question": "What's the options flow and institutional sentiment on Broadcom?"},
     ],
-    # Iteration 3: EV & Energy
+    # Set 3: EV & Clean Energy
     [
-        {"symbol": "TSLA", "question": "What are the bull and bear cases for Tesla according to X KOLs?"},
-        {"symbol": "RIVN", "question": "Is Rivian a buy at current prices? What do analysts say?"},
-        {"symbol": "ENPH", "question": "What's the short interest situation on Enphase?"},
+        {"symbol": "TSLA", "question": "What are the bull and bear cases for Tesla on X?"},
+        {"symbol": "RIVN", "question": "Is Rivian a buy? What do analysts and KOLs say?"},
+        {"symbol": "ENPH", "question": "What's the short interest and sentiment on Enphase Energy?"},
     ],
-    # Iteration 4: Finance & Healthcare
+    # Set 4: Finance & Healthcare
     [
-        {"symbol": "JPM", "question": "How are banks positioned for interest rate changes?"},
-        {"symbol": "UNH", "question": "What's the sentiment on healthcare stocks after recent news?"},
-        {"symbol": "V", "question": "Is Visa a defensive play in current market conditions?"},
+        {"symbol": "JPM", "question": "How are banks positioned for Fed rate decisions?"},
+        {"symbol": "UNH", "question": "What's the sentiment on healthcare stocks and UnitedHealth?"},
+        {"symbol": "V", "question": "Is Visa a defensive play? What do KOLs think?"},
     ],
-    # Iteration 5: Mixed portfolio
+    # Set 5: Big Tech
     [
-        {"symbol": "GOOGL", "question": "What do KOLs think about Google's AI competition with OpenAI?"},
-        {"symbol": "AMZN", "question": "Is Amazon's cloud growth sustainable? What's the X sentiment?"},
-        {"symbol": "META", "question": "Meta's metaverse pivot - are KOLs bullish or bearish?"},
+        {"symbol": "GOOGL", "question": "What do KOLs think about Google's AI vs ChatGPT competition?"},
+        {"symbol": "AMZN", "question": "Is Amazon's AWS growth sustainable? Retail vs cloud debate?"},
+        {"symbol": "META", "question": "Meta's AI pivot - are KOLs bullish or bearish now?"},
+    ],
+    # Set 6: Growth & Momentum
+    [
+        {"symbol": "PLTR", "question": "Is Palantir overvalued? What's the retail sentiment on X?"},
+        {"symbol": "SNOW", "question": "Snowflake growth outlook - what do tech analysts say?"},
+        {"symbol": "CRWD", "question": "CrowdStrike after the outage - buy the dip or avoid?"},
+    ],
+    # Set 7: Value & Dividend
+    [
+        {"symbol": "BRK.B", "question": "Berkshire Hathaway cash pile - what's Buffett thinking?"},
+        {"symbol": "JNJ", "question": "Johnson & Johnson as defensive play - KOL sentiment?"},
+        {"symbol": "PG", "question": "Consumer staples in this economy - is P&G a safe bet?"},
+    ],
+    # Set 8: China & Emerging
+    [
+        {"symbol": "BABA", "question": "Alibaba risk/reward - what do KOLs say about China exposure?"},
+        {"symbol": "PDD", "question": "PDD Holdings (Temu) growth - sustainable or bubble?"},
+        {"symbol": "NIO", "question": "NIO vs Chinese EV competition - buy, hold, or sell?"},
+    ],
+    # Set 9: Retail & Consumer
+    [
+        {"symbol": "WMT", "question": "Walmart vs Amazon - who wins in retail? KOL views?"},
+        {"symbol": "COST", "question": "Costco premium valuation - justified or overpriced?"},
+        {"symbol": "TGT", "question": "Target turnaround - what's the institutional sentiment?"},
+    ],
+    # Set 10: Biotech & Pharma
+    [
+        {"symbol": "LLY", "question": "Eli Lilly weight-loss drugs - is the rally sustainable?"},
+        {"symbol": "MRNA", "question": "Moderna post-COVID - what's next? KOL sentiment?"},
+        {"symbol": "ABBV", "question": "AbbVie dividend and growth outlook - analyst views?"},
     ],
 ]
+
+# Number of sets to cycle through
+NUM_QUESTION_SETS = len(ITERATION_QUESTIONS)
 
 
 def log(msg: str):
@@ -144,6 +177,9 @@ def synthesize_insights(grok_results: list, market_results: list) -> str:
 
 def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> dict:
     """Get Gemini 3 Pro to evaluate and suggest improvements."""
+    import re
+    text = ""
+
     try:
         from google import genai
         from google.genai import types
@@ -151,64 +187,96 @@ def evaluate_with_gemini(synthesis: str, iteration: int, code_context: str) -> d
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         client = genai.Client(api_key=api_key)
 
-        prompt = f"""You are a senior software engineer reviewing a Stock Advisor application.
+        # Simplified prompt for reliable JSON
+        prompt = f"""Evaluate this Stock Advisor output and suggest improvements.
 
-## Current Iteration: {iteration}/5
+SYNTHESIS:
+{synthesis[:3000]}
 
-## Test Results (Synthesized Intelligence):
-{synthesis}
+CODE SNIPPETS:
+{code_context[:4000]}
 
-## Current Code Context:
-{code_context}
+Return ONLY this JSON structure (no markdown, no explanation):
+{{"score": 7, "kol_quality": 7, "market_quality": 7, "issues": ["issue1"], "improvements": [{{"file": "services/grok_service.py", "desc": "description", "old": "exact old code", "new": "new code"}}], "summary": "brief summary"}}
 
-## Your Task:
-1. Score the quality of responses (1-10)
-2. Identify 1-2 specific, small code improvements
-3. Provide EXACT code changes that can be applied with string replacement
+RULES:
+1. score: 1-10 based on data quality
+2. improvements: max 2, with EXACT code snippets from the context above
+3. old must match exactly what's in the code
+4. Keep changes small (1-3 lines)
 
-CRITICAL: Return ONLY valid JSON, no markdown, no explanation. Example:
-{{"score": 6, "quality_breakdown": {{"kol_insights": 7, "market_data": 6, "synthesis": 5, "response_time": 6}}, "issues": [{{"severity": "medium", "description": "Missing error handling", "file": "services/grok_service.py"}}], "improvements": [{{"file": "services/grok_service.py", "description": "Add timeout", "old_code": "timeout=60", "new_code": "timeout=90"}}], "summary": "Good but needs improvements"}}
-
-Rules for improvements:
-- old_code must be EXACT text that exists in the file (copy-paste from code context)
-- new_code must be valid Python
-- Keep changes small (1-3 lines)
-- Focus on: error handling, timeouts, cache TTLs, logging
-
-Return only JSON:"""
+JSON only:"""
 
         response = client.models.generate_content(
             model="gemini-3-pro-preview",
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.3,
-                max_output_tokens=4000,
+                temperature=0.2,
+                max_output_tokens=2000,
             ),
         )
 
-        # Parse JSON from response
-        text = response.text
-        # Find JSON in response
+        # Safely get response text
+        text = response.text if response and response.text else ""
+
+        if not text:
+            log("Empty response from Gemini")
+            return {"score": 6, "issues": [], "improvements": [], "summary": "Empty response"}
+
+        # Clean up response - extract JSON
+        text = text.strip()
+
+        # Remove markdown code blocks
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
+            parts = text.split("```")
+            if len(parts) >= 2:
+                text = parts[1]
 
-        return json.loads(text.strip())
+        # Try to find JSON object
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+        if json_match:
+            text = json_match.group(0)
+
+        result = json.loads(text.strip())
+
+        # Normalize the result structure
+        normalized = {
+            "score": result.get("score", 6),
+            "quality_breakdown": {
+                "kol_insights": result.get("kol_quality", result.get("quality_breakdown", {}).get("kol_insights", 6)),
+                "market_data": result.get("market_quality", result.get("quality_breakdown", {}).get("market_data", 6)),
+            },
+            "issues": result.get("issues", []),
+            "improvements": [],
+            "summary": result.get("summary", "Evaluation complete"),
+        }
+
+        # Convert improvements to standard format
+        for imp in result.get("improvements", []):
+            if isinstance(imp, dict) and imp.get("old") and imp.get("new"):
+                normalized["improvements"].append({
+                    "file": imp.get("file", "services/grok_service.py"),
+                    "description": imp.get("desc", imp.get("description", "Improvement")),
+                    "old_code": imp.get("old", imp.get("old_code", "")),
+                    "new_code": imp.get("new", imp.get("new_code", "")),
+                })
+
+        return normalized
 
     except json.JSONDecodeError as e:
         log(f"JSON parse error: {e}")
-        # Try to extract score from raw text
+        # Extract score with regex fallback
         try:
-            import re
-            score_match = re.search(r'"score":\s*(\d+)', text)
-            score = int(score_match.group(1)) if score_match else 5
-            return {"score": score, "issues": [], "improvements": [], "summary": "JSON parse error - using extracted score"}
+            score_match = re.search(r'"score"[:\s]+(\d+)', text)
+            score = int(score_match.group(1)) if score_match else 6
+            return {"score": score, "issues": [], "improvements": [], "summary": f"JSON parse error, extracted score={score}"}
         except:
-            return {"score": 5, "issues": [], "improvements": [], "summary": "Parse error"}
+            return {"score": 6, "issues": [], "improvements": [], "summary": "Parse error fallback"}
     except Exception as e:
         log(f"Gemini evaluation error: {e}")
-        return {"score": 5, "issues": [], "improvements": [], "summary": str(e)}
+        return {"score": 6, "issues": [], "improvements": [], "summary": str(e)}
 
 
 def apply_improvement(improvement: dict) -> bool:
@@ -341,13 +409,19 @@ def get_code_context() -> str:
     return context[:8000]  # Limit context size
 
 
-def run_iteration(iteration: int) -> dict:
+def run_iteration(iteration: int, total_iterations: int = 0) -> dict:
     """Run a single iteration of the CI loop."""
     log(f"\n{'='*60}")
-    log(f"ITERATION {iteration}/5")
+    if total_iterations > 0:
+        log(f"ITERATION {iteration}/{total_iterations}")
+    else:
+        log(f"ITERATION {iteration} (continuous mode)")
     log(f"{'='*60}")
 
-    questions = ITERATION_QUESTIONS[iteration - 1]
+    # Cycle through question sets
+    question_idx = (iteration - 1) % NUM_QUESTION_SETS
+    questions = ITERATION_QUESTIONS[question_idx]
+    log(f"Using question set {question_idx + 1}/{NUM_QUESTION_SETS}")
     results = {
         "iteration": iteration,
         "started": datetime.now().isoformat(),
@@ -433,68 +507,122 @@ def run_iteration(iteration: int) -> dict:
 
 def main():
     """Run the full autonomous CI loop."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Autonomous CI Improvement Loop")
+    parser.add_argument("-n", "--iterations", type=int, default=0,
+                        help="Number of iterations (0 = unlimited)")
+    parser.add_argument("--no-push", action="store_true",
+                        help="Skip git push (still commits)")
+    parser.add_argument("--target-score", type=int, default=8,
+                        help="Stop when average score reaches this (default: 8)")
+    args = parser.parse_args()
+
+    max_iterations = args.iterations
+    mode = "continuous" if max_iterations == 0 else f"{max_iterations} iterations"
+
     print("=" * 60, flush=True)
     print("AUTONOMOUS CI IMPROVEMENT LOOP - Stock Advisor", flush=True)
     print("=" * 60, flush=True)
     print(f"Started: {datetime.now().isoformat()}", flush=True)
-    print(f"Iterations: 5", flush=True)
+    print(f"Mode: {mode}", flush=True)
+    print(f"Target score: {args.target_score}/10", flush=True)
+    print(f"Question sets: {NUM_QUESTION_SETS}", flush=True)
     print(flush=True)
 
     # Check environment
     xai_key = os.getenv("XAI_API_KEY")
     gemini_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    finnhub_key = os.getenv("FINNHUB_API_KEY")
 
     print("Environment:", flush=True)
     print(f"  XAI_API_KEY: {'Set' if xai_key else 'Not set'}", flush=True)
     print(f"  GEMINI_API_KEY: {'Set' if gemini_key else 'Not set'}", flush=True)
+    print(f"  FINNHUB_API_KEY: {'Set' if finnhub_key else 'Not set'}", flush=True)
 
     if not gemini_key:
-        print("\nERROR: GEMINI_API_KEY required for evaluation")
+        print("\nERROR: GEMINI_API_KEY required for evaluation", flush=True)
         sys.exit(1)
 
     all_results = []
+    iteration = 0
+    consecutive_high_scores = 0
 
-    for i in range(1, 6):
+    while True:
+        iteration += 1
+
+        # Check if we've reached max iterations
+        if max_iterations > 0 and iteration > max_iterations:
+            log(f"\nReached max iterations ({max_iterations})")
+            break
+
         try:
-            result = run_iteration(i)
+            result = run_iteration(iteration, max_iterations)
             all_results.append(result)
 
+            # Track high scores
+            score = result.get("final_score", 0)
+            if score >= args.target_score:
+                consecutive_high_scores += 1
+                if consecutive_high_scores >= 3:
+                    log(f"\nReached target score {args.target_score}/10 for 3 consecutive iterations!")
+                    break
+            else:
+                consecutive_high_scores = 0
+
+            # Save intermediate results every 5 iterations
+            if iteration % 5 == 0:
+                save_results(all_results, f"checkpoint_iter{iteration}")
+                print_summary(all_results)
+
             # Brief pause between iterations
-            if i < 5:
-                log(f"\nWaiting 5s before next iteration...")
-                time.sleep(5)
+            log(f"\nWaiting 3s before next iteration...")
+            time.sleep(3)
 
         except KeyboardInterrupt:
             log("\nInterrupted by user")
             break
         except Exception as e:
-            log(f"\nIteration {i} failed: {e}")
-            all_results.append({"iteration": i, "error": str(e)})
+            log(f"\nIteration {iteration} failed: {e}")
+            import traceback
+            traceback.print_exc()
+            all_results.append({"iteration": iteration, "error": str(e)})
+            # Continue on error
+            time.sleep(5)
 
     # Final summary
+    print_summary(all_results)
+    save_results(all_results, "final")
+
+
+def print_summary(all_results: list):
+    """Print summary of results."""
     print("\n" + "=" * 60, flush=True)
-    print("FINAL SUMMARY", flush=True)
+    print("SUMMARY", flush=True)
     print("=" * 60, flush=True)
 
     scores = [r.get("final_score", 0) for r in all_results if r.get("final_score")]
     improvements = sum(r.get("improvements_applied", 0) for r in all_results)
     commits = sum(1 for r in all_results if r.get("committed"))
 
-    print(f"Scores by iteration: {scores}", flush=True)
+    print(f"Iterations completed: {len(all_results)}", flush=True)
+    print(f"Scores: {scores[-10:]}" + (" ..." if len(scores) > 10 else ""), flush=True)
     print(f"Average score: {sum(scores)/len(scores):.1f}/10" if scores else "N/A", flush=True)
     print(f"Total improvements applied: {improvements}", flush=True)
     print(f"Total commits: {commits}", flush=True)
 
-    # Save results
+
+def save_results(all_results: list, suffix: str = ""):
+    """Save results to JSON file."""
     output_dir = Path(__file__).parent.parent / "output"
     output_dir.mkdir(exist_ok=True)
-    output_file = output_dir / f"autonomous_ci_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_file = output_dir / f"autonomous_ci_{timestamp}_{suffix}.json"
 
     with open(output_file, "w") as f:
         json.dump(all_results, f, indent=2, default=str)
 
-    print(f"\nResults saved to: {output_file}")
-    print(f"Completed: {datetime.now().isoformat()}")
+    print(f"Results saved to: {output_file}", flush=True)
 
 
 if __name__ == "__main__":

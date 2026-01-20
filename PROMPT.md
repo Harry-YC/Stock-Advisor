@@ -530,3 +530,58 @@ python3 tests/test_ci_workflow.py
 # Reset if broken
 git checkout .
 ```
+
+---
+
+## Autonomous CI Loop (RECOMMENDED)
+
+Run the continuous CI improvement loop:
+
+```bash
+# Run 10 iterations
+python3 -u tests/autonomous_ci_loop.py -n 10
+
+# Run continuously until score >= 8 for 3 iterations
+python3 -u tests/autonomous_ci_loop.py
+
+# Run with custom target score
+python3 -u tests/autonomous_ci_loop.py --target-score 9
+```
+
+### What the CI Loop Does
+
+Each iteration:
+1. **Grok KOL Insights** - Gets X/Twitter sentiment from finance influencers
+2. **Market News** - Searches real-time news via Google Search Grounding
+3. **Synthesize** - Combines all gathered intelligence
+4. **Gemini Evaluation** - Scores quality and suggests improvements
+5. **Apply Improvements** - Auto-applies code fixes with syntax validation
+6. **Git Commit & Push** - Commits changes after each improvement
+
+### Stock Question Sets (10 sets, cycles through)
+
+| Set | Theme | Tickers |
+|-----|-------|---------|
+| 1 | Mega-cap Tech | NVDA, AAPL, MSFT |
+| 2 | Semiconductor & AI | TSM, AMD, AVGO |
+| 3 | EV & Clean Energy | TSLA, RIVN, ENPH |
+| 4 | Finance & Healthcare | JPM, UNH, V |
+| 5 | Big Tech | GOOGL, AMZN, META |
+| 6 | Growth & Momentum | PLTR, SNOW, CRWD |
+| 7 | Value & Dividend | BRK.B, JNJ, PG |
+| 8 | China & Emerging | BABA, PDD, NIO |
+| 9 | Retail & Consumer | WMT, COST, TGT |
+| 10 | Biotech & Pharma | LLY, MRNA, ABBV |
+
+### CI Loop Output Files
+
+Results saved to `/Users/nelsonliu/Stock Advisor/output/`:
+- `autonomous_ci_YYYYMMDD_HHMMSS_final.json` - Full results
+- `autonomous_ci_YYYYMMDD_HHMMSS_checkpoint_iterN.json` - Checkpoints every 5 iterations
+
+### Stop Conditions
+
+The loop stops when:
+1. Reached `--iterations` limit (if specified)
+2. Score >= `--target-score` for 3 consecutive iterations
+3. Keyboard interrupt (Ctrl+C)
