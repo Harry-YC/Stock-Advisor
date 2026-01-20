@@ -350,7 +350,7 @@ See `PROMPT.md` for the 9-phase autonomous improvement workflow:
 
 ---
 
-## Autonomous CI Loop (RECOMMENDED)
+## Stock Advisor Improvement Loop (RECOMMENDED)
 
 The most efficient way to continuously improve the codebase:
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Autonomous CI Improvement Loop for Stock Advisor
+Stock Advisor Improvement Loop for Stock Advisor
 
 Runs 5 iterations of:
 1. Ask different stock questions
@@ -506,10 +506,10 @@ def run_iteration(iteration: int, total_iterations: int = 0) -> dict:
 
 
 def main():
-    """Run the full autonomous CI loop."""
+    """Run the full Stock Advisor improvement loop."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Autonomous CI Improvement Loop")
+    parser = argparse.ArgumentParser(description="Stock Advisor Improvement Loop")
     parser.add_argument("-n", "--iterations", type=int, default=0,
                         help="Number of iterations (0 = unlimited)")
     parser.add_argument("--no-push", action="store_true",
@@ -522,7 +522,7 @@ def main():
     mode = "continuous" if max_iterations == 0 else f"{max_iterations} iterations"
 
     print("=" * 60, flush=True)
-    print("AUTONOMOUS CI IMPROVEMENT LOOP - Stock Advisor", flush=True)
+    print("STOCK ADVISOR IMPROVEMENT LOOP - Stock Advisor", flush=True)
     print("=" * 60, flush=True)
     print(f"Started: {datetime.now().isoformat()}", flush=True)
     print(f"Mode: {mode}", flush=True)

@@ -533,7 +533,7 @@ git checkout .
 
 ---
 
-## Autonomous CI Loop (RECOMMENDED)
+## Stock Advisor Improvement Loop (RECOMMENDED)
 
 Run the continuous CI improvement loop:
 
@@ -548,7 +548,7 @@ python3 -u tests/autonomous_ci_loop.py
 python3 -u tests/autonomous_ci_loop.py --target-score 9
 ```
 
-### What the CI Loop Does
+### What the Stock Advisor Loop Does
 
 Each iteration:
 1. **Grok KOL Insights** - Gets X/Twitter sentiment from finance influencers
@@ -573,7 +573,7 @@ Each iteration:
 | 9 | Retail & Consumer | WMT, COST, TGT |
 | 10 | Biotech & Pharma | LLY, MRNA, ABBV |
 
-### CI Loop Output Files
+### Stock Advisor Loop Output Files
 
 Results saved to `/Users/nelsonliu/Stock Advisor/output/`:
 - `autonomous_ci_YYYYMMDD_HHMMSS_final.json` - Full results
